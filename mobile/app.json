@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "AgriVoice",
+    "slug": "agrivoice",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a7a1a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.agrivoice.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "AgriVoice needs microphone access to record your voice questions.",
+        "NSLocationWhenInUseUsageDescription": "AgriVoice uses your location to provide local weather and market prices."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a7a1a"
+      },
+      "package": "com.agrivoice.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "AgriVoice needs microphone access to record your voice questions."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "AgriVoice uses your location for local weather and prices."
+        }
+      ]
+    ]
+  }
+}

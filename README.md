@@ -1,6 +1,6 @@
-# 🌾 AgriVoice
+# AgriVoice
 
-A voice-powered mobile assistant for Filipino farmers — providing real-time crop advice, market prices, and weather forecasts in multiple regional languages (Filipino, Cebuano, Ilocano, and more).
+A voice-powered mobile assistant for Filipino farmers, providing real-time crop advice, market prices, and weather forecasts in multiple regional languages (Filipino, Cebuano, Ilocano, and more).
 
 ---
 
@@ -19,9 +19,9 @@ A voice-powered mobile assistant for Filipino farmers — providing real-time cr
 
 ```
 AgriVoice/
-├── mobile/          # Expo React Native app
-├── backend/         # FastAPI Python server
-├── docs/            # Documentation, research, API specs
+├── backend/
+├── docs/
+├── mobile/
 └── README.md
 ```
 
@@ -31,7 +31,7 @@ AgriVoice/
 
 ### Prerequisites
 - Node.js 18+ and npm/yarn
-- Python 3.11+
+- Python 3.14+
 - Expo CLI (`npm install -g expo-cli`)
 - Groq API key (https://console.groq.com)
 - Supabase project (https://supabase.com)
@@ -51,23 +51,6 @@ python -m venv venv
 venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-```
-
----
-
-## Environment Variables
-
-### Backend (`backend/.env`)
-```
-GROQ_API_KEY=your_groq_api_key
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_anon_key
-BACKEND_PORT=8000
-```
-
-### Mobile (`mobile/.env`)
-```
-EXPO_PUBLIC_BACKEND_URL=http://your-local-ip:8000
 ```
 
 ---

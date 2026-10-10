@@ -66,14 +66,7 @@ export default function App() {
           <Tab.Screen name="Weather" component={WeatherScreen} options={{ title: "Weather" }} />
           <Tab.Screen name="History" component={HistoryScreen} options={{ title: "My Queries" }} />
 
-          <Tab.Screen name="Settings">
-            {() => (
-              <SettingsScreen
-                selectedRegion={selectedRegion}
-                setSelectedRegion={setSelectedRegion}
-              />
-            )}
-          </Tab.Screen>
+          <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

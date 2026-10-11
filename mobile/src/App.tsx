@@ -17,6 +17,8 @@ import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
+import { LanguageProvider } from "./context/LanguageContext";
+
 const Tab = createBottomTabNavigator();
 
 const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -33,9 +35,10 @@ export default function App() {
   );
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
+    <LanguageProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
 
         <Tab.Navigator
           screenOptions={({ route }) => ({
@@ -76,6 +79,7 @@ export default function App() {
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
-    </SafeAreaProvider>
+     </SafeAreaProvider>
+    </LanguageProvider>
   );
 }

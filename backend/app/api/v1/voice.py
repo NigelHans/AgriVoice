@@ -24,6 +24,10 @@ async def voice_query(
     3. Return both transcript and AI response
     """
     audio_bytes = await audio.read()
+    print(f"🎤 Audio filename: {audio.filename}")
+    print(f"🎤 Audio content type: {audio.content_type}")
+    print(f"🎤 Audio size: {len(audio_bytes)} bytes")
+    print(f"🎤 Audio header bytes: {audio_bytes[:16].hex()}")
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty audio file received.")
 

@@ -65,22 +65,40 @@ export default function VoiceScreen({ selectedRegion }: VoiceScreenProps) {
     setIsRecording(false);
     setIsLoading(true);
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
+await recordingRef.current.stopAndUnloadAsync();
 
-      if (!uri) throw new Error("No audio URI");
+console.log("✅ stopAndUnloadAsync completed");
 
-      // STEP 3: Pass selectedRegion down into your API helper function call
-      const result = await sendVoiceQuery(uri, language, selectedRegion);
+const uri = recordingRef.current.getURI();
+
+console.log("🎤 Recording stopped. Audio URI:", uri);
+
+recordingRef.current = null;
+
+if (!uri) throw new Error("No audio URI");
+
+console.log("📡 About to call sendVoiceQuery");
+
+const result = await sendVoiceQuery(uri, language, selectedRegion);
+
+console.log("✅ sendVoiceQuery completed");
 
       setTranscript(result.transcript);
       setReply(result.reply);
-    } catch (err) {
-      Alert.alert("Error", "Could not process your voice query. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+
+      } catch (err: any) {
+        console.log("❌ VOICE ERROR:", err);
+        console.log("❌ VOICE ERROR MESSAGE:", err?.message);
+        console.log("❌ VOICE ERROR RESPONSE:", err?.response?.data);
+
+        Alert.alert(
+          "Voice Error",
+          err?.message || "Could not process your voice query."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+
   };
 
   return (

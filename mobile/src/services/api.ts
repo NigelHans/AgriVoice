@@ -27,9 +27,17 @@ export async function sendVoiceQuery(
   formData.append("language", language);
   formData.append("location", location);
 
+  console.log("📤 Sending voice file to:", BASE_URL);
+  console.log("📤 Audio URI:", audioUri);
+  console.log("📤 Language:", language);
+  console.log("📤 Location:", location);
+
   const response = await api.post("/api/v1/voice/transcribe", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+
+  console.log("📥 Voice response:", response.data);
+
   return response.data;
 }
 

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Groq
     GROQ_API_KEY: str = ""
     GROQ_STT_MODEL: str = "whisper-large-v3"
-    GROQ_LLM_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_LLM_MODEL: str = "openai/gpt-oss-120b"
 
     # Supabase
     SUPABASE_URL: str = ""

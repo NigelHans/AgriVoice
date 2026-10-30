@@ -1,3 +1,4 @@
+
 """
 Market Price Service
 Reads crop prices from Supabase and provides price history for trend charts.
@@ -8,9 +9,9 @@ from app.schemas.market import MarketPriceList, CropPriceHistory, CropPrice, Pri
 
 
 async def get_prices(region: str = "", crop: str = "") -> MarketPriceList:
-    """Fetch today's crop prices, optionally filtered by region and/or crop."""
+    """Fetch the latest crop prices, optionally filtered by region and/or crop."""
     db = get_supabase_client()
-    query = db.table("market_prices").select("*").eq("price_date", date.today().isoformat())
+    query = db.table("market_prices").select("*")
 
     if region:
         query = query.ilike("region", f"%{region}%")
@@ -18,23 +19,67 @@ async def get_prices(region: str = "", crop: str = "") -> MarketPriceList:
         query = query.ilike("crop_name", f"%{crop}%")
 
     result = query.execute()
-    prices = [CropPrice(**row) for row in result.data]
+    prices = []
+
+    for row in result.data:
+        price = row.get("fair_price_per_kg")
+        updated = row.get("updated_at")
+
+        if price is None:
+            continue
+
+        # Map the actual database columns to the existing API schema.
+        price_date = str(updated or date.today().isoformat())[:10]
+
+        prices.append(
+            CropPrice(
+                id=row.get("id"),
+                crop_name=row["crop_name"],
+                region=row["region"],
+                price_per_kg=float(price),
+                unit="kg",
+                price_date=price_date,
+                source="WFP",
+            )
+        )
+
     return MarketPriceList(prices=prices, count=len(prices))
 
 
 async def get_price_history(crop_name: str, days: int = 30) -> CropPriceHistory:
-    """Fetch price history for a single crop over the past N days."""
+    """
+    Fetch available stored prices for a crop.
+
+    The current database sync keeps the latest price per crop and region,
+    so this returns available latest records, not a complete daily history.
+    """
     db = get_supabase_client()
-    since = (date.today() - timedelta(days=days)).isoformat()
 
     result = (
         db.table("market_prices")
-        .select("price_date, price_per_kg, region")
+        .select("crop_name, region, fair_price_per_kg, updated_at")
         .ilike("crop_name", f"%{crop_name}%")
-        .gte("price_date", since)
-        .order("price_date")
         .execute()
     )
 
-    points = [PricePoint(**row) for row in result.data]
+    points = []
+
+    for row in result.data:
+        price = row.get("fair_price_per_kg")
+        updated = row.get("updated_at")
+
+        if price is None:
+            continue
+
+        points.append(
+            PricePoint(
+                price_date=str(updated or date.today().isoformat())[:10],
+                price_per_kg=float(price),
+                region=row["region"],
+            )
+        )
+
+    since = date.today() - timedelta(days=days)
+    points = [point for point in points if point.price_date >= since]
+
     return CropPriceHistory(crop_name=crop_name, history=points)

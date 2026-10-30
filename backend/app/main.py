@@ -25,12 +25,17 @@ def run_price_sync():
     CROP_MAPPING = {
         "Onions (red)": "Onion",
         "Tomatoes": "Tomato",
-        "Rice (regular milled)": "Rice"
+        "Rice (regular, milled)": "Rice",
+        "Rice (well milled)": "Rice",
+        "Rice (special)": "Rice",
+        "Rice (milled, superior)": "Rice",
+        "Rice (paddy)": "Rice",
+        "Rice (premium)": "Rice"
     }
     
     try:
         # Initialize Supabase inside the task using your settings file parameters
-        supabase_client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        supabase_client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
         
         # Read data directly from HDX, skipping the 2nd system-metadata row index
         df = pd.read_csv(WFP_CSV_URL, skiprows=[1])
@@ -57,7 +62,10 @@ def run_price_sync():
                     "updated_at": "now()"
                 }
                 # Upsert updates the row if the unique constraint matches, preventing duplication
-                supabase_client.table("market_prices").upsert(data_payload).execute()
+                supabase_client.table("market_prices").upsert(
+    data_payload,
+    on_conflict="crop_name,region"
+).execute()
                 updated_pairs.add(tracking_key)
                 
         print("🎉 [Startup] Dynamic Market Price Sync Complete!")

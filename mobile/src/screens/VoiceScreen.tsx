@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { sendVoiceQuery } from "../services/api";
 import { useLanguage } from "../context/LanguageContext";
 import LanguagePicker from "../components/LanguagePicker";
+import Markdown from "react-native-markdown-display";
 
 // STEP 1: Define the TypeScript rule for the props coming from App.tsx
 interface VoiceScreenProps {
@@ -159,7 +160,46 @@ console.log("✅ sendVoiceQuery completed");
           <View style={styles.divider} />
 
           <Text style={styles.cardLabel}>💡 Diskarte sa Pakikipagtawaran:</Text>
-          <Text style={styles.cardText}>{reply.strategy}</Text>
+          <Markdown
+            style={{
+              body: {
+                fontSize: 15,
+                color: "#333",
+                lineHeight: 22,
+              },
+              heading1: {
+                fontSize: 20,
+                fontWeight: "bold",
+                color: "#1a7a1a",
+              },
+              heading2: {
+                fontSize: 18,
+                fontWeight: "bold",
+                color: "#1a7a1a",
+              },
+              heading3: {
+                fontSize: 16,
+                fontWeight: "bold",
+                color: "#1a7a1a",
+              },
+              strong: {
+                fontWeight: "bold",
+                color: "#222",
+              },
+              bullet_list: {
+                marginVertical: 4,
+              },
+              ordered_list: {
+                marginVertical: 4,
+              },
+              paragraph: {
+                marginTop: 4,
+                marginBottom: 8,
+              },
+            }}
+          >
+            {reply.strategy || ""}
+          </Markdown>
         </View>
       )}
     </ScrollView>

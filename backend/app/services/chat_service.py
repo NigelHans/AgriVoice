@@ -43,18 +43,23 @@ async def get_ai_response(
     # ◄ Get your active Supabase client singleton instance
     supabase_client = get_supabase_client()
 
-    # Reference dynamic WFP records from Supabase
-    db_query = supabase_client.table("market_prices")\
-        .select("fair_price_per_kg")\
-        .eq("crop_name", crop)\
-        .eq("region", location)\
+    # Retrieve the latest WFP price for the selected crop and region.
+    db_query = (
+        supabase_client.table("market_prices")
+        .select("fair_price_per_kg, updated_at, region")
+        .ilike("crop_name", crop)
+        .ilike("region", location)
+        .order("updated_at", desc=True)
+        .limit(1)
         .execute()
-    
-    if db_query.data:
-        fair_price = float(db_query.data[0]["fair_price_per_kg"])
-    else:
-        fallback = supabase_client.table("market_prices").select("fair_price_per_kg").eq("crop_name", crop).execute()
-        fair_price = float(fallback.data[0]["fair_price_per_kg"]) if fallback.data else 30.0
+    )
+
+    if not db_query.data:
+        raise ValueError(
+            f"No WFP price found for {crop} in {location}."
+        )
+
+    fair_price = float(db_query.data[0]["fair_price_per_kg"])
 
     total_market_value = fair_price * weight
 

@@ -3,7 +3,7 @@
  * All endpoints are routed through this file.
  */
 import axios from "axios";
-import type { CropPrice, DailyForecast, WeatherForecast } from "../types";
+import type { ChatResponse, CropPrice, VoiceResponse, WeatherForecast } from "../types";
 
 // In production, replace with your deployed backend URL.
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -17,7 +17,7 @@ export async function sendVoiceQuery(
   audioUri: string,
   language: string,
   location: string = ""
-): Promise<{ transcript: string; reply: any }> { // ◄ STEP 1: Changed "reply: string" to "reply: any" to support structured JSON objects
+): Promise<VoiceResponse> {
   const formData = new FormData();
   formData.append("audio", {
     uri: audioUri,
@@ -41,9 +41,29 @@ export async function sendTextQuery(
   language: string,
   location: string = "",
   history: any[] = []
-): Promise<string> {
+): Promise<ChatResponse> {
   const response = await api.post("/api/v1/chat/ask", { message, language, location, history });
-  return response.data.reply;
+  return response.data;
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+export type ApiErrorKind = "offline" | "timeout" | "unclear" | "serviceDown" | "server" | "unknown";
+
+/**
+ * What kind of failure a request had, for translated UI messages (see i18n API_ERROR_KEYS).
+ * Backend `detail` text is English and is not shown; log the error itself separately.
+ */
+export function classifyApiError(err: unknown): { kind: ApiErrorKind; status?: number } {
+  if (!axios.isAxiosError(err)) return { kind: "unknown" };
+  if (!err.response) {
+    return { kind: err.code === "ECONNABORTED" || err.code === "ETIMEDOUT" ? "timeout" : "offline" };
+  }
+  const { status } = err.response;
+  if (status === 400 || status === 422) return { kind: "unclear", status };
+  if (status === 502) return { kind: "serviceDown", status };
+  return { kind: "server", status };
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +75,8 @@ export async function fetchMarketPrices(region = "", crop = ""): Promise<CropPri
 }
 
 export async function fetchPriceHistory(cropName: string, days = 30) {
-  const response = await api.get(`/api/v1/market/history/${cropName}`, { params: { days } });
+  // Crop names can contain spaces, commas and brackets, e.g. "Rice (regular, milled)"
+  const response = await api.get(`/api/v1/market/history/${encodeURIComponent(cropName)}`, { params: { days } });
   return response.data;
 }
 

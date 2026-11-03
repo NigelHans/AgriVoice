@@ -3,12 +3,15 @@
  * Bottom Tab Navigator + Region Selector State
  */
 
-import React, { useState } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { LanguageProvider } from "./context/LanguageContext";
+import { RegionProvider } from "./context/RegionContext";
+import { useT } from "./i18n";
 
 // Screens
 import VoiceScreen from "./screens/VoiceScreen";
@@ -28,15 +31,25 @@ const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function App() {
-  const [selectedRegion, setSelectedRegion] = useState<string>(
-    "National Capital Region"
-  );
-
   return (
     <SafeAreaProvider>
+      <LanguageProvider>
+      <RegionProvider>
       <NavigationContainer>
         <StatusBar style="light" />
+        <AppTabs />
+      </NavigationContainer>
+      </RegionProvider>
+      </LanguageProvider>
+    </SafeAreaProvider>
+  );
+}
 
+// Inside LanguageProvider, so tab labels and headers follow the selected language.
+// Route names stay English: other screens navigate by them.
+function AppTabs() {
+  const t = useT();
+  return (
         <Tab.Navigator
           screenOptions={({ route }) => ({
             headerStyle: { backgroundColor: "#1a7a1a" },
@@ -55,20 +68,15 @@ export default function App() {
         >
           <Tab.Screen
             name="Voice"
-            options={{ title: "🌾 AgriVoice", tabBarLabel: "Voice" }}
-          >
-            {() => (
-              <VoiceScreen selectedRegion={selectedRegion} />
-            )}
-          </Tab.Screen>
+            component={VoiceScreen}
+            options={{ title: "🌾 AgriVoice", tabBarLabel: t("tab.voice") }}
+          />
 
-          <Tab.Screen name="Market" component={MarketScreen} options={{ title: "Market Prices" }} />
-          <Tab.Screen name="Weather" component={WeatherScreen} options={{ title: "Weather" }} />
-          <Tab.Screen name="History" component={HistoryScreen} options={{ title: "My Queries" }} />
+          <Tab.Screen name="Market" component={MarketScreen} options={{ title: t("header.market"), tabBarLabel: t("tab.market") }} />
+          <Tab.Screen name="Weather" component={WeatherScreen} options={{ title: t("header.weather"), tabBarLabel: t("tab.weather") }} />
+          <Tab.Screen name="History" component={HistoryScreen} options={{ title: t("header.history"), tabBarLabel: t("tab.history") }} />
 
-          <Tab.Screen name="Settings" component={SettingsScreen} />
+          <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: t("header.settings"), tabBarLabel: t("tab.settings") }} />
         </Tab.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
   );
 }

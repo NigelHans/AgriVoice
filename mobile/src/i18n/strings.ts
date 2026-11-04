@@ -84,6 +84,10 @@ const en = {
   "market.priceDate": "Price date: {date}",
   "market.legacyBadge": "Old price · Unverified",
   "market.source": "Source: {source}",
+  "market.sectionVerified": "Verified prices",
+  "market.sectionOlder": "Older reference prices",
+  "market.sectionOlderHint": "Not verified, and the report date is unknown. Use only as a rough guide.",
+  "market.verifiedBadge": "Verified",
 
   // Weather screen
   "weather.locating": "Finding your location…",
@@ -241,6 +245,10 @@ const fil: Dictionary = {
   "market.priceDate": "Petsa ng presyo: {date}",
   "market.legacyBadge": "Lumang presyo · Hindi beripikado",
   "market.source": "Pinagmulan: {source}",
+  "market.sectionVerified": "Beripikadong presyo",
+  "market.sectionOlder": "Lumang presyo (sanggunian lang)",
+  "market.sectionOlderHint": "Hindi beripikado at hindi alam ang petsa ng ulat. Gamitin lang bilang gabay.",
+  "market.verifiedBadge": "Beripikado",
 
   "weather.locating": "Hinahanap ang iyong lokasyon…",
   "weather.fetching": "Kinukuha ang taya ng panahon…",
@@ -394,6 +402,10 @@ const mixed: Dictionary = {
   "market.priceDate": "Petsa ng presyo / Price date: {date}",
   "market.legacyBadge": "Lumang presyo · Hindi beripikado (Old price · Unverified)",
   "market.source": "Pinagmulan / Source: {source}",
+  "market.sectionVerified": "Beripikadong presyo / Verified prices",
+  "market.sectionOlder": "Lumang presyo / Older reference prices",
+  "market.sectionOlderHint": "Hindi beripikado at hindi alam ang petsa. (Not verified; report date unknown. Use only as a rough guide.)",
+  "market.verifiedBadge": "Beripikado / Verified",
 
   "weather.locating": "Hinahanap ang iyong lokasyon… (Finding your location…)",
   "weather.fetching": "Kinukuha ang taya ng panahon… (Loading the forecast…)",

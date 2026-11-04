@@ -3,13 +3,19 @@
  * Data fetched from the FastAPI /market/prices endpoint (backed by Supabase).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, FlatList, TextInput, StyleSheet, RefreshControl, TouchableOpacity } from "react-native";
+import { View, Text, SectionList, TextInput, StyleSheet, RefreshControl } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { fetchMarketPrices } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import type { CropPrice } from "../types";
 import StatusView from "../components/StatusView";
-import { colors } from "../theme";
+import Card from "../components/Card";
+import Chip from "../components/Chip";
+import Badge from "../components/Badge";
+import Button from "../components/Button";
+import SectionHeader from "../components/SectionHeader";
+import { colors, spacing, radius, type } from "../theme";
 
 type Scope = "mine" | "all";
 
@@ -103,69 +109,111 @@ export default function MarketScreen() {
     return <StatusView icon="search-outline" title={t("market.noMatch", { search: search.trim() })} />;
   };
 
+  // Verified prices first; pre-migration (legacy) rows separately, so old data never looks current.
+  // Empty sections are left out, so the empty-state message shows when nothing matches.
+  const sections = [
+    { key: "verified", title: t("market.sectionVerified"), hint: undefined, data: visible.filter((p) => !p.is_legacy) },
+    { key: "older", title: t("market.sectionOlder"), hint: t("market.sectionOlderHint"), data: visible.filter((p) => p.is_legacy) },
+  ].filter((s) => s.data.length > 0);
+
   return (
     <View style={styles.container}>
-      <TextInput style={styles.search} placeholder={t("market.searchPlaceholder")} value={search} onChangeText={setSearch} />
+      <View style={styles.searchBox}>
+        <MaterialCommunityIcons name="magnify" size={22} color={colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={t("market.searchPlaceholder")}
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          accessibilityLabel={t("market.searchPlaceholder")}
+        />
+      </View>
 
       <View style={styles.scopeRow}>
-        {(["mine", "all"] as const).map((s) => (
-          <TouchableOpacity key={s} style={[styles.chip, scope === s && styles.chipActive]} onPress={() => setScope(s)}>
-            <Text style={[styles.chipText, scope === s && styles.chipTextActive]}>
-              {s === "mine" ? t("market.scopeMine") : t("market.scopeAll")}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <Chip label={t("market.scopeMine")} icon="map-marker-outline" selected={scope === "mine"} onPress={() => setScope("mine")} />
+        <Chip label={t("market.scopeAll")} icon="earth" selected={scope === "all"} onPress={() => setScope("all")} />
       </View>
-      {scope === "mine" && <Text style={styles.scopeCaption}>{t("market.showingRegion", { region: getRegionLabel(region) })}</Text>}
+      {scope === "mine" && (
+        <View style={styles.captionRow}>
+          <MaterialCommunityIcons name="map-marker" size={16} color={colors.accent} />
+          <Text style={styles.scopeCaption}>{t("market.showingRegion", { region: getRegionLabel(region) })}</Text>
+        </View>
+      )}
 
       {error && (
         <View style={styles.banner}>
+          <MaterialCommunityIcons name="wifi-off" size={20} color={colors.danger} />
           <Text style={styles.bannerText}>{t("market.refreshFailed")}</Text>
-          <TouchableOpacity onPress={refresh} disabled={refreshing}>
-            <Text style={styles.bannerRetry}>{t("common.retryShort")}</Text>
-          </TouchableOpacity>
+          <Button label={t("common.retryShort")} variant="text" onPress={refresh} disabled={refreshing} />
         </View>
       )}
-      <FlatList
-        data={visible}
+
+      <SectionList
+        sections={sections}
         contentContainerStyle={styles.listContent}
+        stickySectionHeadersEnabled={false}
         // crop_name + region is unique in the response; id can be null
         keyExtractor={(item) => `${item.crop_name}|${item.region}`}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={styles.rowTop}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cropName}>{item.crop_name}</Text>
-                <Text style={styles.region}>{getRegionLabel(item.region)}</Text>
-              </View>
-              <Text style={styles.price}>₱{item.price_per_kg.toFixed(2)}/{item.unit?.trim() || "kg"}</Text>
-            </View>
-            <PriceDetails item={item} t={t} />
-          </View>
-        )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />
+        }
+        renderSectionHeader={({ section }) => <SectionHeader title={section.title} hint={section.hint} />}
+        renderItem={({ item }) => <PriceCard item={item} t={t} />}
         ListEmptyComponent={emptyMessage()}
       />
     </View>
   );
 }
 
-// Date or legacy badge, then source. Nothing is shown for values the API did not return.
+// Crop name and price per kilogram first; then region, verification, date and source
+function PriceCard({ item, t }: { item: CropPrice; t: Translate }) {
+  return (
+    <Card style={styles.card}>
+      <View style={styles.cardTop}>
+        <View style={styles.cropIcon}>
+          <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={26} color={colors.primary} />
+        </View>
+        <View style={styles.cropInfo}>
+          <Text style={styles.cropName}>{item.crop_name}</Text>
+          <Text style={styles.region}>{getRegionLabel(item.region)}</Text>
+        </View>
+        <View style={styles.priceBox}>
+          <Text style={[styles.price, item.is_legacy && styles.priceLegacy]}>₱{item.price_per_kg.toFixed(2)}</Text>
+          <Text style={styles.unit}>/ {item.unit?.trim() || "kg"}</Text>
+        </View>
+      </View>
+      <PriceDetails item={item} t={t} />
+    </Card>
+  );
+}
+
+// Verified badge with date, or the legacy badge (never a legacy date); then source.
+// Nothing is shown for values the API did not return.
 function PriceDetails({ item, t }: { item: CropPrice; t: Translate }) {
   // A legacy row's price_date is only the date it was synced, so it is never shown
   const date = item.is_legacy ? null : formatPriceMonth(item.price_date);
   const source = item.source?.trim();
-  if (!item.is_legacy && !date && !source) return null;
   return (
     <View style={styles.details}>
       {item.is_legacy ? (
-        <Text style={styles.legacyBadge}>{t("market.legacyBadge")}</Text>
+        <Badge label={t("market.legacyBadge")} tone="warning" icon="alert-outline" />
       ) : (
-        date && <Text style={styles.detailText}>{t("market.priceDate", { date })}</Text>
+        <View style={styles.detailRow}>
+          <Badge label={t("market.verifiedBadge")} tone="success" icon="check-decagram-outline" />
+          {date && <Text style={styles.detailText}>{t("market.priceDate", { date })}</Text>}
+        </View>
       )}
       {source ? <Text style={styles.detailText}>{t("market.source", { source })}</Text> : null}
     </View>
   );
+}
+
+// shortcut: only crops with their own icon are mapped; add more when new crops are synced
+function cropIcon(cropName: string): keyof typeof MaterialCommunityIcons.glyphMap {
+  if (/rice|palay|bigas/i.test(cropName)) return "rice";
+  if (/corn|mais/i.test(cropName)) return "corn";
+  return "sprout";
 }
 
 // WFP prices are monthly; "2026-08-15" → "Aug 2026" (en-PH format, like the rest of the app)
@@ -178,24 +226,29 @@ function formatPriceMonth(value: string): string | null {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  search:    { margin: 12, marginBottom: 8, padding: 10, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
-  scopeRow:  { flexDirection: "row", marginHorizontal: 12, gap: 8 },
-  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary },
-  chipActive:{ backgroundColor: colors.primary },
-  chipText:  { color: colors.primary, fontWeight: "600" },
-  chipTextActive: { color: colors.onPrimary },
-  scopeCaption: { marginHorizontal: 12, marginTop: 6, fontSize: 12, color: colors.textMuted },
-  row:       { backgroundColor: colors.card, marginHorizontal: 12, marginBottom: 8, padding: 14, borderRadius: 10, elevation: 2 },
-  rowTop:    { flexDirection: "row", alignItems: "center" },
-  cropName:  { fontWeight: "bold", fontSize: 15, color: colors.primary },
-  region:    { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  price:     { fontWeight: "bold", fontSize: 17, color: colors.text },
-  details:   { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider },
-  detailText:{ fontSize: 12, color: colors.textMuted },
-  legacyBadge: { alignSelf: "flex-start", fontSize: 12, fontWeight: "bold", color: colors.warningText, backgroundColor: colors.warningBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginBottom: 2, overflow: "hidden" },
-  listContent: { flexGrow: 1, paddingTop: 8, paddingBottom: 16 },
-  banner:      { flexDirection: "row", alignItems: "center", backgroundColor: colors.dangerBg, marginHorizontal: 12, marginTop: 8, padding: 10, borderRadius: 8 },
-  bannerText:  { flex: 1, fontSize: 12, color: colors.danger },
-  bannerRetry: { color: colors.primary, fontWeight: "bold", marginLeft: 8 },
+  container:    { flex: 1, backgroundColor: colors.background },
+  searchBox:    { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.lg,
+                  paddingHorizontal: spacing.md, minHeight: 52, borderRadius: radius.md, backgroundColor: colors.card,
+                  borderWidth: 1, borderColor: colors.border },
+  searchInput:  { flex: 1, ...type.body, color: colors.text, paddingVertical: spacing.sm },
+  scopeRow:     { flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.md },
+  captionRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.lg, marginTop: spacing.sm },
+  scopeCaption: { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
+  banner:       { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.md,
+                  paddingLeft: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
+  bannerText:   { flex: 1, ...type.caption, color: colors.danger },
+  listContent:  { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  card:         { marginBottom: spacing.md },
+  cardTop:      { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  cropIcon:     { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: colors.successBg },
+  cropInfo:     { flex: 1 },
+  cropName:     { ...type.title, fontWeight: "700", color: colors.text },
+  region:       { ...type.caption, color: colors.textSecondary },
+  priceBox:     { alignItems: "flex-end" },
+  price:        { ...type.headline, fontWeight: "700", color: colors.primary },
+  priceLegacy:  { color: colors.textSecondary },
+  unit:         { ...type.caption, color: colors.textSecondary },
+  details:      { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider, gap: spacing.xs },
+  detailRow:    { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
+  detailText:   { ...type.caption, color: colors.accent },
 });

@@ -31,6 +31,11 @@ LANGUAGE_NAMES = {
 
 MAX_HISTORY_TURNS = 10
 
+# The app shows answers exactly as written and reads them aloud, so Markdown would appear as stray symbols
+# (gpt-oss models use it by default). Lines starting with "• " are the only list format the app lays out.
+PLAIN_TEXT_RULE = """Format: plain text only. No Markdown: no **bold**, no # headings, no tables, no code blocks.
+For a list, start each item on its own line with "• "."""
+
 EXTRACTION_PROMPT = """You extract structured data from a Filipino farmer's message.
 Respond with a JSON object only, using exactly these keys:
   "intent": "negotiation" if the farmer is asking about a price or a buyer's offer for a crop, otherwise "general"
@@ -214,7 +219,8 @@ Note: recorded prices are retail; farmgate prices are normally lower, so judge f
 Write a concise reply in {_language_name(language)}. If an offer and a verified price are both known, say clearly
 whether the offer looks fair or underpriced. Suggest a realistic counter-offer goal only when it can be based on
 the figures above, and give 2 short, practical lines the farmer can say out loud to bargain.
-Keep it conversational, encouraging, and actionable."""
+Keep it conversational, encouraging, and actionable.
+{PLAIN_TEXT_RULE}"""
 
     strategy = await _complete(
         settings.GROQ_LLM_MODEL,
@@ -255,7 +261,8 @@ async def _advice_reply(
 The farmer is in {location or 'the Philippines'}. Give practical, accurate advice on crops, planting, pests,
 soil, weather and farm practices suited to Philippine conditions. Keep answers concise and easy to follow.
 If you are not sure, say so and suggest contacting the local Municipal Agriculture Office.
-Reply in {_language_name(language)}."""
+Reply in {_language_name(language)}.
+{PLAIN_TEXT_RULE}"""
 
     answer = await _complete(
         settings.GROQ_LLM_MODEL,

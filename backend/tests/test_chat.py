@@ -48,6 +48,19 @@ def test_general_question_passes_cleaned_history_and_language(client, fake_groq,
     assert messages[1:] == [{"role": "user", "content": "Hi"}, {"role": "user", "content": "Soil tips?"}]
 
 
+
+def test_both_reply_prompts_ask_for_plain_text(client, fake_groq, fake_supabase):
+    from app.services.chat_service import PLAIN_TEXT_RULE
+    advice = fake_groq(chat_replies=[extraction(intent="general"), "Use compost."])
+    fake_supabase()
+    client.post("/api/v1/chat/ask", json={"message": "Soil tips?", "language": "en"})
+    assert PLAIN_TEXT_RULE in advice.chat_calls[1]["messages"][0]["content"]
+
+    negotiation = fake_groq(chat_replies=[extraction(intent="negotiation", crop="onion", weight_kg=100, offer_per_kg=60), "Underpriced"])
+    fake_supabase(respond=lambda filters: [ONION_NCR])
+    client.post("/api/v1/chat/ask", json={"message": "100 kilo sibuyas, 60 piso alok"})
+    assert PLAIN_TEXT_RULE in negotiation.chat_calls[1]["messages"][0]["content"]
+
 def test_negotiation_uses_regional_price_case_insensitively(client, fake_groq, fake_supabase):
     fake_groq(chat_replies=[extraction(intent="negotiation", crop="onion", weight_kg=100, offer_per_kg=60), "Underpriced!"])
     db = fake_supabase(respond=lambda filters: [ONION_NCR])

@@ -20,9 +20,17 @@ import MarketScreen from "./screens/MarketScreen";
 import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+import { withFocusFade } from "./components/FocusFade";
 import { colors, type } from "./theme";
 
 const Tab = createBottomTabNavigator();
+
+// Each tab screen fades in softly when focused (created once, outside render)
+const VoiceTab = withFocusFade(VoiceScreen);
+const MarketTab = withFocusFade(MarketScreen);
+const WeatherTab = withFocusFade(WeatherScreen);
+const HistoryTab = withFocusFade(HistoryScreen);
+const SettingsTab = withFocusFade(SettingsScreen);
 
 const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Voice: "microphone",
@@ -85,15 +93,15 @@ function AppTabs() {
         >
           <Tab.Screen
             name="Voice"
-            component={VoiceScreen}
+            component={VoiceTab}
             options={{ title: "🌾 AgriVoice", tabBarLabel: t("tab.voice") }}
           />
 
-          <Tab.Screen name="Market" component={MarketScreen} options={{ title: t("header.market"), tabBarLabel: t("tab.market") }} />
-          <Tab.Screen name="Weather" component={WeatherScreen} options={{ title: t("header.weather"), tabBarLabel: t("tab.weather") }} />
-          <Tab.Screen name="History" component={HistoryScreen} options={{ title: t("header.history"), tabBarLabel: t("tab.history") }} />
+          <Tab.Screen name="Market" component={MarketTab} options={{ title: t("header.market"), tabBarLabel: t("tab.market") }} />
+          <Tab.Screen name="Weather" component={WeatherTab} options={{ title: t("header.weather"), tabBarLabel: t("tab.weather") }} />
+          <Tab.Screen name="History" component={HistoryTab} options={{ title: t("header.history"), tabBarLabel: t("tab.history") }} />
 
-          <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: t("header.settings"), tabBarLabel: t("tab.settings") }} />
+          <Tab.Screen name="Settings" component={SettingsTab} options={{ title: t("header.settings"), tabBarLabel: t("tab.settings") }} />
         </Tab.Navigator>
   );
 }

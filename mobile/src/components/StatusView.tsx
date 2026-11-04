@@ -5,7 +5,8 @@ import React from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "./Button";
-import { colors, spacing, type } from "../theme";
+import Skeleton from "./Skeleton";
+import { colors, radius, spacing, type } from "../theme";
 
 type Props = {
   loading?: boolean;
@@ -24,6 +25,17 @@ export default function StatusView({
   loading, icon, tone = "neutral", title, text, detail, actionLabel, onAction, secondaryLabel, onSecondary,
 }: Props) {
   const error = tone === "error";
+  // Loading without a message: placeholder cards in the shape of the content that is coming
+  if (loading && !text && !title) {
+    return (
+      <View style={styles.skeletons} accessibilityState={{ busy: true }}>
+        <Skeleton height={52} style={styles.skeletonBar} />
+        <Skeleton height={140} style={styles.skeletonCard} />
+        <Skeleton height={120} style={styles.skeletonCard} />
+        <Skeleton height={120} style={styles.skeletonCard} />
+      </View>
+    );
+  }
   return (
     <View style={styles.container} accessibilityLiveRegion="polite">
       {loading && <ActivityIndicator size="large" color={colors.primary} />}
@@ -55,4 +67,7 @@ const styles = StyleSheet.create({
   detail:          { ...type.caption, color: colors.textMuted, marginTop: spacing.sm, textAlign: "center" },
   action:          { marginTop: spacing.xl },
   secondary:       { marginTop: spacing.sm },
+  skeletons:       { flexGrow: 1, padding: spacing.lg, gap: spacing.md, backgroundColor: colors.background },
+  skeletonBar:     { borderRadius: radius.xl },
+  skeletonCard:    { borderRadius: radius.lg },
 });

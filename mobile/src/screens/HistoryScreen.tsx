@@ -128,7 +128,7 @@ export default function HistoryScreen() {
               <View style={[styles.railLine, index === section.data.length - 1 && styles.railLineEnd]} />
               <View style={styles.railDot} />
             </View>
-            <FadeInView index={index} style={styles.cardWrap}>
+            <FadeInView index={index < 6 ? index : 0} style={styles.cardWrap}>
               <PressableScale
                 onPress={() => { setActionError(null); setSelected(item); }}
                 accessibilityRole="button"

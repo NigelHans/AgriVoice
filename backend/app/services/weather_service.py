@@ -4,6 +4,7 @@ Fetches 7-day forecast from Open-Meteo (free, no API key required).
 Provides rainfall probability — critical for planting decisions in the Philippines.
 """
 import httpx
+from app.core.errors import ExternalServiceError
 from app.schemas.weather import WeatherForecast, DailyForecast
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
@@ -30,12 +31,14 @@ async def get_weather_forecast(lat: float, lon: float) -> WeatherForecast:
         "forecast_days": 7,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(OPEN_METEO_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(OPEN_METEO_URL, params=params)
+            response.raise_for_status()
+            daily = response.json()["daily"]
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        raise ExternalServiceError("Weather service", str(exc)) from exc
 
-    daily = data["daily"]
     forecasts = [
         DailyForecast(
             date=daily["time"][i],

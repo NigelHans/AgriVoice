@@ -14,10 +14,14 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_STT_MODEL: str = "whisper-large-v3"
     GROQ_LLM_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_EXTRACTION_MODEL: str = "llama-3.1-8b-instant"
 
     # Supabase
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
+
+    # Pull the latest WFP prices into Supabase in the background on startup
+    PRICE_SYNC_ON_STARTUP: bool = True
 
     # Server
     BACKEND_HOST: str = "0.0.0.0"

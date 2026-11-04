@@ -3,13 +3,17 @@ Transcription Service
 Sends audio bytes to Groq Whisper-Large-v3 and returns the transcript.
 """
 import io
+
+import groq
+
 from app.core.groq_client import get_groq_client
 from app.core.config import settings
+from app.core.errors import ExternalServiceError
 
 # Maps our language codes to Whisper's expected language codes
 LANGUAGE_MAP = {
     "fil": "tl",   # Filipino / Tagalog
-    "ceb": "ceb",  # Cebuano
+    "ceb": None,   # Cebuano — not in Whisper's language list; fall back to auto-detect
     "ilo": None,   # Ilocano — not a Whisper native; fall back to auto-detect
     "en": "en",
 }
@@ -32,13 +36,20 @@ async def transcribe_audio(audio_bytes: bytes, filename: str, language: str = "f
 
     audio_file = (filename, io.BytesIO(audio_bytes), _get_mime(filename))
 
-    transcription = await client.audio.transcriptions.create(
-        model=settings.GROQ_STT_MODEL,
-        file=audio_file,
-        language=whisper_lang,
-        response_format="text",
-    )
-    return transcription.strip()
+    params = {"language": whisper_lang} if whisper_lang else {}
+    try:
+        transcription = await client.audio.transcriptions.create(
+            model=settings.GROQ_STT_MODEL,
+            file=audio_file,
+            response_format="text",
+            **params,
+        )
+    except groq.GroqError as exc:
+        raise ExternalServiceError("Speech recognition", str(exc)) from exc
+
+    # "text" format returns a plain string; tolerate a JSON Transcription object too
+    text = transcription if isinstance(transcription, str) else getattr(transcription, "text", "")
+    return (text or "").strip()
 
 
 def _get_mime(filename: str) -> str:

@@ -1,76 +1,32 @@
 """
 AgriVoice — FastAPI Application Factory
 """
+import asyncio
+import logging
 from contextlib import asynccontextmanager
-import pandas as pd
-from supabase import create_client, Client
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.errors import ExternalServiceError
 from app.api.v1 import voice, chat, market, weather
+from app.services.price_sync import run_price_sync
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
-# Background Lifespan Task — Syncs dynamic market data on startup
+# Lifespan — syncs WFP market prices in a background thread so the server
+# starts accepting requests immediately
 # ---------------------------------------------------------------------------
-def run_price_sync():
-    """
-    Fetches the latest UN-WFP food price data for the Philippines
-    and updates the dynamic Supabase market tables.
-    """
-    print("🔄 [Startup] Fetching live regional market dataset...")
-    
-    WFP_CSV_URL = "https://data.humdata.org/dataset/wfp-food-prices-for-philippines/resource/9a842d72-0d7d-4922-ad0e-eb8106c1ab0e/download/wfp_food_prices_phl.csv"
-    
-    CROP_MAPPING = {
-        "Onions (red)": "Onion",
-        "Tomatoes": "Tomato",
-        "Rice (regular milled)": "Rice"
-    }
-    
-    try:
-        # Initialize Supabase inside the task using your settings file parameters
-        supabase_client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
-        
-        # Read data directly from HDX, skipping the 2nd system-metadata row index
-        df = pd.read_csv(WFP_CSV_URL, skiprows=[1])
-        df_filtered = df[df['commodity'].isin(CROP_MAPPING.keys())].copy()
-        df_filtered = df_filtered.sort_values(by='date', ascending=False)
-        
-        updated_pairs = set()
-        
-        for _, row in df_filtered.iterrows():
-            raw_crop = row['commodity']
-            clean_crop = CROP_MAPPING[raw_crop]
-            region = row['admin1']     
-            province = row['admin2']   
-            price = float(row['price'])
-            
-            tracking_key = f"{clean_crop}-{region}"
-            
-            if tracking_key not in updated_pairs:
-                data_payload = {
-                    "crop_name": clean_crop,
-                    "region": region,
-                    "province": province,
-                    "fair_price_per_kg": price,
-                    "updated_at": "now()"
-                }
-                # Upsert updates the row if the unique constraint matches, preventing duplication
-                supabase_client.table("market_prices").upsert(data_payload).execute()
-                updated_pairs.add(tracking_key)
-                
-        print("🎉 [Startup] Dynamic Market Price Sync Complete!")
-    except Exception as e:
-        print(f"⚠️ [Startup Warning] Failed to sync market data on boot: {e}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # This runs immediately when your Render server instances boot up
-    run_price_sync()
+    if settings.PRICE_SYNC_ON_STARTUP:
+        app.state.price_sync_task = asyncio.create_task(asyncio.to_thread(run_price_sync))
     yield
-    # Any teardown/shutdown logic would go here if needed
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +49,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Errors — upstream failures become 502 instead of an opaque 500
+# ---------------------------------------------------------------------------
+@app.exception_handler(ExternalServiceError)
+async def external_service_error_handler(request: Request, exc: ExternalServiceError):
+    logger.error("External service failure on %s: %s", request.url.path, exc)
+    return JSONResponse(
+        status_code=502,
+        content={"detail": f"{exc.service} is unavailable right now. Please try again."},
+    )
 
 # ---------------------------------------------------------------------------
 # Routers

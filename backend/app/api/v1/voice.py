@@ -29,8 +29,10 @@ async def voice_query(
 
     # 1. Transcribe audio array into text using your existing service architecture
     transcript = await transcribe_audio(audio_bytes, audio.filename or "audio.m4a", language)
-    
-    # 2. Get structured negotiation data block back from your chat engine service
+    if not transcript:
+        raise HTTPException(status_code=422, detail="Could not understand the recording. Please try again.")
+
+    # 2. Negotiation analysis or general advice from the chat engine service
     ai_reply = await get_ai_response(transcript, language=language, location=location)
 
     # 3. Compile everything neatly into your strict output schema

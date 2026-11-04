@@ -13,14 +13,14 @@ async def current_prices(
     region: str = Query("", description="Filter by region, e.g. 'Region X'"),
     crop: str = Query("", description="Filter by crop name, e.g. 'palay'"),
 ):
-    """Return today's crop market prices from Supabase."""
+    """Return the latest known price for each crop/region from Supabase."""
     return await get_prices(region=region, crop=crop)
 
 
 @router.get("/history/{crop_name}", response_model=CropPriceHistory)
 async def price_history(
     crop_name: str,
-    days: int = Query(30, description="Number of past days to retrieve"),
+    days: int = Query(30, ge=1, le=365, description="Number of past days to retrieve"),
 ):
     """Return historical prices for a specific crop (for trend charts)."""
     return await get_price_history(crop_name=crop_name, days=days)

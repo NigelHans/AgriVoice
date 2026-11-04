@@ -15,10 +15,10 @@ async def text_query(payload: ChatRequest):
     Text query endpoint.
     Accepts a question in any supported language and returns AI advice.
     """
-    reply = await get_ai_response(
+    analysis = await get_ai_response(
         payload.message,
         language=payload.language,
         location=payload.location,
         history=payload.history,
     )
-    return ChatResponse(reply=reply)
+    return ChatResponse(reply=analysis.strategy, analysis=analysis)

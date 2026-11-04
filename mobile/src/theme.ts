@@ -57,7 +57,7 @@ export const type = {
   bodyLarge: { fontSize: 18, lineHeight: 26 },
   title:     { fontSize: 20, lineHeight: 28 },
   headline:  { fontSize: 28, lineHeight: 34, letterSpacing: -0.3 },
-  display:   { fontSize: 40, lineHeight: 46, letterSpacing: -0.8 },
+  display:   { fontSize: 40, lineHeight: 50, letterSpacing: -0.4 },
 };
 
 export const spacing = {

@@ -241,10 +241,10 @@ function FeaturedPrice({ item, t }: { item: CropPrice; t: Translate }) {
           <Text style={styles.region}>{getRegionLabel(item.region)}</Text>
         </View>
       </View>
-      <Text style={styles.featuredPrice} accessibilityLabel={`₱${item.price_per_kg.toFixed(2)} / ${item.unit?.trim() || "kg"}`}>
-        ₱{item.price_per_kg.toFixed(2)}
-        <Text style={styles.featuredUnit}>  / {item.unit?.trim() || "kg"}</Text>
-      </Text>
+      <View style={styles.priceRow} accessible accessibilityLabel={`₱${item.price_per_kg.toFixed(2)} / ${item.unit?.trim() || "kg"}`}>
+        <Text style={styles.featuredPrice}>₱{item.price_per_kg.toFixed(2)}</Text>
+        <Text style={styles.featuredUnit}>/ {item.unit?.trim() || "kg"}</Text>
+      </View>
       <PriceDetails item={item} t={t} />
     </View>
   );
@@ -258,10 +258,12 @@ function PriceTile({ item, t }: { item: CropPrice; t: Translate }) {
         <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={22} color={item.is_legacy ? colors.textSecondary : colors.primary} />
         <Text style={styles.tileCrop} numberOfLines={1}>{item.crop_name}</Text>
       </View>
-      <Text style={[styles.tilePrice, item.is_legacy && styles.priceLegacy]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-        ₱{item.price_per_kg.toFixed(2)}
-        <Text style={styles.tileUnit}> / {item.unit?.trim() || "kg"}</Text>
-      </Text>
+      <View style={styles.priceRow} accessible accessibilityLabel={`₱${item.price_per_kg.toFixed(2)} / ${item.unit?.trim() || "kg"}`}>
+        <Text style={[styles.tilePrice, item.is_legacy && styles.priceLegacy]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          ₱{item.price_per_kg.toFixed(2)}
+        </Text>
+        <Text style={styles.tileUnit}>/ {item.unit?.trim() || "kg"}</Text>
+      </View>
       <Text style={styles.region} numberOfLines={2}>{getRegionLabel(item.region)}</Text>
       <PriceDetails item={item} t={t} />
     </Surface>
@@ -329,7 +331,9 @@ const styles = StyleSheet.create({
   featuredInfo:  { flex: 1 },
   featuredCrop:  { ...type.headline, fontWeight: "700", color: colors.text },
   featuredPrice: { ...type.display, fontWeight: "700", color: colors.primary },
-  featuredUnit:  { ...type.body, fontWeight: "600", color: colors.textSecondary, letterSpacing: 0 },
+  featuredUnit:  { ...type.body, fontWeight: "600", color: colors.textSecondary },
+  // Price and unit sit side by side on one baseline; the unit wraps below instead of clipping
+  priceRow:      { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
 
   grid:          { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   gridCell:      { width: "47.5%", flexGrow: 1 },
@@ -337,8 +341,8 @@ const styles = StyleSheet.create({
   tile:          { flex: 1, gap: spacing.sm },
   tileTop:       { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   tileCrop:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
-  tilePrice:     { ...type.headline, fontSize: 26, fontWeight: "700", color: colors.primary },
-  tileUnit:      { ...type.caption, fontWeight: "600", color: colors.textSecondary, letterSpacing: 0 },
+  tilePrice:     { ...type.headline, fontSize: 26, fontWeight: "700", color: colors.primary, flexShrink: 1 },
+  tileUnit:      { ...type.caption, fontWeight: "600", color: colors.textSecondary },
   priceLegacy:   { color: colors.textSecondary },
   region:        { ...type.caption, color: colors.textSecondary },
   details:       { gap: spacing.xs, marginTop: spacing.xs },

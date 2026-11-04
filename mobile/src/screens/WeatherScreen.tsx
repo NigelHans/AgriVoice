@@ -288,10 +288,10 @@ function TodayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t:
   const { title, subtitle } = dayLabel(day.date, t);
   return (
     <Card style={[styles.todayCard, severe && styles.severeEdge]}>
-      <Text style={styles.todayTitle}>
-        {title}
-        {subtitle !== "" && <Text style={styles.todaySub}>  {subtitle}</Text>}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.todayTitle}>{title}</Text>
+        {subtitle !== "" && <Text style={styles.todaySub}>{subtitle}</Text>}
+      </View>
       <View style={styles.todayMain}>
         <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={72} color={severe ? colors.warningText : colors.primary} />
         <View style={styles.todayInfo}>
@@ -317,10 +317,10 @@ function DayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t: T
       <View style={styles.dayTop}>
         <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={36} color={severe ? colors.warningText : colors.primary} />
         <View style={styles.dayInfo}>
-          <Text style={styles.dayTitle}>
-            {title}
-            {subtitle !== "" && <Text style={styles.daySub}>  {subtitle}</Text>}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.dayTitle}>{title}</Text>
+            {subtitle !== "" && <Text style={styles.daySub}>{subtitle}</Text>}
+          </View>
           <Text style={[styles.dayDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
         </View>
         <Text style={styles.dayTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
@@ -452,6 +452,8 @@ const styles = StyleSheet.create({
   warningText:  { ...type.caption, color: colors.warningText },
 
   todayCard:    { marginBottom: spacing.sm },
+  // Day name and date side by side on one baseline (not nested, so neither clips the other)
+  titleRow:     { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
   todayTitle:   { ...type.title, fontWeight: "700", color: colors.text },
   todaySub:     { ...type.caption, fontWeight: "400", color: colors.textSecondary },
   todayMain:    { flexDirection: "row", alignItems: "center", gap: spacing.lg, marginTop: spacing.md },

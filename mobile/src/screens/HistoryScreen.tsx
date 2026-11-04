@@ -8,10 +8,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { loadHistory, deleteHistoryEntry, clearHistory } from "../services/historyStorage";
 import { LANGUAGES } from "../context/LanguageContext";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useT, type StringKey, type Translate } from "../i18n";
 import type { HistoryEntry } from "../types";
 import StatusView from "../components/StatusView";
-import { colors } from "../theme";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import Badge from "../components/Badge";
+import { colors, spacing, radius, cardShadow, type } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
 
@@ -103,24 +107,35 @@ export default function HistoryScreen() {
   return (
     <View style={styles.container}>
       {history.length > 0 && (
-        <TouchableOpacity style={styles.clearBtn} onPress={confirmClearAll}>
-          <Text style={styles.clearText}>{t("history.clearAll")}</Text>
-        </TouchableOpacity>
+        <View style={styles.toolbar}>
+          <Button label={t("history.clearAll")} variant="danger" icon="delete-sweep-outline" onPress={confirmClearAll} />
+        </View>
       )}
-      {actionError && !selected && <Text style={styles.actionError}>{t(actionError)}</Text>}
+      {actionError && !selected && <ActionError text={t(actionError)} />}
       <FlatList
         data={[...history].reverse()}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={history.length === 0 ? styles.emptyList : undefined}
+        contentContainerStyle={history.length === 0 ? styles.emptyList : styles.list}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => { setActionError(null); setSelected(item); }}>
-            <View style={styles.metaRow}>
-              <Text style={styles.time}>{formatTimestamp(item.timestamp, t)}</Text>
-              {item.language !== "" && <Text style={styles.lang}>{languageLabel(item.language)}</Text>}
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => { setActionError(null); setSelected(item); }}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.transcript || "—"}. ${t("history.view")}`}
+          >
+            <Meta entry={item} t={t} />
+            <View style={styles.line}>
+              <MaterialCommunityIcons name="account-voice" size={20} color={colors.primary} />
+              <Text style={styles.question} numberOfLines={2}>{item.transcript || "—"}</Text>
             </View>
-            <Text style={styles.q} numberOfLines={2}>🎤 {item.transcript || "—"}</Text>
-            <Text style={styles.a} numberOfLines={3}>🤖 {item.reply || "—"}</Text>
-            <Text style={styles.viewHint}>{t("history.view")}</Text>
+            <View style={styles.line}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color={colors.secondary} />
+              <Text style={styles.answer} numberOfLines={2}>{item.reply || "—"}</Text>
+            </View>
+            <View style={styles.viewRow}>
+              <Text style={styles.viewText}>{t("history.view")}</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+            </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
@@ -138,31 +153,55 @@ export default function HistoryScreen() {
         {selected && (
           <SafeAreaView style={styles.modal}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setSelected(null)}>
-                <Text style={styles.closeText}>{t("history.close")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => confirmDelete(selected)}>
-                <Text style={styles.clearText}>{t("history.delete")}</Text>
-              </TouchableOpacity>
+              <Button label={t("history.close")} variant="text" icon="chevron-left" onPress={() => setSelected(null)} />
+              <Button label={t("history.delete")} variant="danger" icon="delete-outline" onPress={() => confirmDelete(selected)} />
             </View>
-            {actionError && <Text style={styles.actionError}>{t(actionError)}</Text>}
+            {actionError && <ActionError text={t(actionError)} />}
             <ScrollView contentContainerStyle={styles.modalBody}>
-              <View style={styles.metaRow}>
-                <Text style={styles.time}>{formatTimestamp(selected.timestamp, t)}</Text>
-                {selected.language !== "" && <Text style={styles.lang}>{languageLabel(selected.language)}</Text>}
-              </View>
-              <View style={styles.detailCard}>
-                <Text style={styles.detailLabel}>{t("voice.yourQuestion")}</Text>
-                <Text style={styles.detailText}>{selected.transcript || "—"}</Text>
-              </View>
-              <View style={[styles.detailCard, styles.replyCard]}>
-                <Text style={styles.detailLabel}>{t("history.answer")}</Text>
-                <Text style={styles.detailText}>{selected.reply || "—"}</Text>
-              </View>
+              <Meta entry={selected} t={t} />
+              <Card style={styles.detailCard}>
+                <DetailTitle icon="account-voice" text={t("voice.yourQuestion")} />
+                <Text style={styles.detailText} selectable>{selected.transcript || "—"}</Text>
+              </Card>
+              <Card style={[styles.detailCard, styles.replyCard]}>
+                <DetailTitle icon="lightbulb-on-outline" text={t("history.answer")} />
+                <Text style={styles.detailText} selectable>{selected.reply || "—"}</Text>
+              </Card>
             </ScrollView>
           </SafeAreaView>
         )}
       </Modal>
+    </View>
+  );
+}
+
+// When it was asked, and in which language
+function Meta({ entry, t }: { entry: HistoryEntry; t: Translate }) {
+  return (
+    <View style={styles.metaRow}>
+      <View style={styles.timeRow}>
+        <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textMuted} />
+        <Text style={styles.time}>{formatTimestamp(entry.timestamp, t)}</Text>
+      </View>
+      {entry.language !== "" && <Badge label={languageLabel(entry.language)} icon="translate" />}
+    </View>
+  );
+}
+
+function DetailTitle({ icon, text }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; text: string }) {
+  return (
+    <View style={styles.detailTitleRow}>
+      <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
+      <Text style={styles.detailTitle} accessibilityRole="header">{text}</Text>
+    </View>
+  );
+}
+
+function ActionError({ text }: { text: string }) {
+  return (
+    <View style={styles.actionError} accessibilityRole="alert">
+      <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.danger} />
+      <Text style={styles.actionErrorText}>{text}</Text>
     </View>
   );
 }
@@ -179,30 +218,39 @@ function formatTimestamp(iso: string, t: Translate): string {
   return `${date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}, ${time}`;
 }
 
+// Full language name; an unknown saved code is shown as it was stored
 function languageLabel(code: string): string {
-  const lang = LANGUAGES.find((l) => l.code === code);
-  return lang ? `${lang.flag} ${lang.code.toUpperCase()}` : code.toUpperCase();
+  return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 12 },
-  emptyList: { flexGrow: 1 },
-  clearBtn:  { alignSelf: "flex-end", marginBottom: 8 },
-  clearText: { color: colors.danger, fontWeight: "bold" },
-  card:      { backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 10, elevation: 2 },
-  metaRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  time:      { fontSize: 11, color: colors.textFaint },
-  lang:      { fontSize: 11, color: colors.primary, fontWeight: "600" },
-  q:         { fontWeight: "bold", color: colors.text, marginBottom: 4 },
-  a:         { color: colors.textSecondary, lineHeight: 20 },
-  viewHint:  { alignSelf: "flex-end", marginTop: 6, fontSize: 12, color: colors.primary, fontWeight: "600" },
-  actionError: { color: colors.danger, fontSize: 13, textAlign: "center", marginBottom: 8, paddingHorizontal: 12 },
-  modal:       { flex: 1, backgroundColor: colors.background },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.card },
-  closeText:   { color: colors.primary, fontWeight: "bold", fontSize: 15 },
-  modalBody:   { padding: 16 },
-  detailCard:  { backgroundColor: colors.card, borderRadius: 12, padding: 16, marginTop: 12, elevation: 2 },
-  replyCard:   { borderLeftWidth: 4, borderLeftColor: colors.primary },
-  detailLabel: { fontWeight: "bold", color: colors.primary, marginBottom: 6 },
-  detailText:  { fontSize: 15, color: colors.text, lineHeight: 22 },
+  container:       { flex: 1, backgroundColor: colors.background },
+  toolbar:         { alignItems: "flex-end", paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
+  emptyList:       { flexGrow: 1 },
+  list:            { padding: spacing.lg, paddingTop: spacing.sm },
+
+  card:            { backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md, ...cardShadow },
+  metaRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap",
+                     gap: spacing.sm, marginBottom: spacing.md },
+  timeRow:         { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  time:            { ...type.caption, color: colors.textMuted },
+  line:            { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, marginBottom: spacing.sm },
+  question:        { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
+  answer:          { ...type.body, color: colors.textSecondary, flex: 1 },
+  viewRow:         { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", minHeight: 32 },
+  viewText:        { ...type.body, fontWeight: "700", color: colors.primary },
+
+  actionError:     { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.sm,
+                     padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
+  actionErrorText: { ...type.caption, color: colors.danger, flex: 1 },
+
+  modal:           { flex: 1, backgroundColor: colors.background },
+  modalHeader:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.xs,
+                     paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.card },
+  modalBody:       { padding: spacing.lg },
+  detailCard:      { marginTop: spacing.md },
+  replyCard:       { borderLeftWidth: 4, borderLeftColor: colors.primary },
+  detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
+  detailTitle:     { ...type.bodyLarge, fontWeight: "700", color: colors.primary, flex: 1 },
+  detailText:      { ...type.body, color: colors.text },
 });

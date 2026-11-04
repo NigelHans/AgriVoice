@@ -59,6 +59,12 @@ const en = {
   "voice.micStartLabel": "Start recording",
   "voice.micStopLabel": "Stop recording",
   "voice.sendLabel": "Send question",
+  "voice.tryAsking": "Try asking",
+  "voice.suggestPrice": "How much is rice today?",
+  "voice.suggestOffer": "A buyer offered ₱60 per kilo for my onions. Is that fair?",
+  "voice.suggestPest": "How do I protect my tomatoes from pests?",
+  "voice.listen": "Listen to the answer",
+  "voice.stopSpeaking": "Stop reading",
 
   // Shared
   "common.retry": "Retry",
@@ -232,6 +238,12 @@ const fil: Dictionary = {
   "voice.micStartLabel": "Simulan ang pag-record",
   "voice.micStopLabel": "Itigil ang pag-record",
   "voice.sendLabel": "Ipadala ang tanong",
+  "voice.tryAsking": "Subukang itanong",
+  "voice.suggestPrice": "Magkano ang bigas ngayon?",
+  "voice.suggestOffer": "Inalok ako ng ₱60 kada kilo para sa sibuyas ko. Patas ba iyon?",
+  "voice.suggestPest": "Paano ko mapoprotektahan sa peste ang kamatis ko?",
+  "voice.listen": "Pakinggan ang sagot",
+  "voice.stopSpeaking": "Itigil ang pagbasa",
 
   "common.retry": "Subukan muli",
   "common.retryShort": "Subukan muli",
@@ -399,6 +411,12 @@ const mixed: Dictionary = {
   "voice.micStartLabel": "Simulan ang pag-record / Start recording",
   "voice.micStopLabel": "Itigil ang pag-record / Stop recording",
   "voice.sendLabel": "Ipadala ang tanong / Send question",
+  "voice.tryAsking": "Subukang itanong (Try asking)",
+  "voice.suggestPrice": "Magkano ang bigas ngayon?",
+  "voice.suggestOffer": "Inalok ako ng ₱60 kada kilo para sa sibuyas ko. Patas ba iyon?",
+  "voice.suggestPest": "Paano ko mapoprotektahan sa peste ang kamatis ko?",
+  "voice.listen": "Pakinggan ang sagot / Listen to the answer",
+  "voice.stopSpeaking": "Itigil ang pagbasa / Stop reading",
 
   "common.retry": "Subukan Muli / Retry",
   "common.retryShort": "Retry",

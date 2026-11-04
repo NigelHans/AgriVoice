@@ -5,7 +5,7 @@
  * 1. Farmer taps the big microphone button → recording starts
  * 2. Farmer taps again → recording stops → audio sent to backend
  * 3. Backend returns transcript + AI reply
- * 4. Reply is displayed (and optionally played via TTS)
+ * 4. Reply is displayed; a spoken question also gets its answer read aloud
  *
  * Without the microphone, the farmer can type the question instead. A recognised
  * transcript can be corrected and asked again; both go through /chat/ask.
@@ -36,17 +36,20 @@ import Button from "../components/Button";
 import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
 import PriceText from "../components/PriceText";
-import FieldIllustration from "../components/FieldIllustration";
 import { useReduceMotion } from "../components/motion";
 import { appendHistory } from "../services/historyStorage";
+import { speak, stopSpeaking } from "../services/speech";
 import type { AssistantReply } from "../types";
 import { colors, spacing, radius, type, fonts } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
-const MIC = 112;          // microphone disc (fixed at the bottom, within thumb reach)
-const RING = MIC + 18;    // clay / ember ring around it
-const ARC = RING + 18;    // processing arc
+const MIC = 96;           // microphone disc (bottom right, within thumb reach)
+const RING = MIC + 16;    // leaf / ember ring around it
+const ARC = RING + 16;    // processing arc
+
+// Example questions for a first-time user; tapping one asks it
+const SUGGESTIONS = ["voice.suggestPrice", "voice.suggestOffer", "voice.suggestPest"] as const;
 
 // Errors are stored as keys and translated when shown, so they follow a language change.
 // `typeInstead` adds the "type your question below" hint.
@@ -81,16 +84,34 @@ export default function VoiceScreen() {
   const { region } = useRegion();
   const regionLabel = getRegionLabel(region);
 
+  // Read-aloud state. Each reading gets a number, so a stopped reading can't clear a newer one.
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const readingRef = useRef(0);
+  const startSpeaking = (text: string) => {
+    const reading = ++readingRef.current;
+    setIsSpeaking(true);
+    const current = () => readingRef.current === reading;
+    speak(text, language, () => { if (current()) setIsSpeaking(false); }, current);
+  };
+  const stopAnswer = () => {
+    readingRef.current++;
+    setIsSpeaking(false);
+    stopSpeaking();
+  };
+
   // Leaving the tab (or unmounting) mid-recording discards the recording and releases the mic
   useFocusEffect(useCallback(() => () => {
     const recording = recordingRef.current;
     recordingRef.current = null;
     setIsRecording(false);
     recording?.stopAndUnloadAsync().catch((err) => console.warn("Could not release recorder", err));
+    stopAnswer();
   }, []));
 
   const startRecording = async () => {
     if (busyRef.current || recordingRef.current) return;
+    // Never record the phone reading its own answer
+    stopAnswer();
     setError(null);
     let recording: Audio.Recording | null = null;
     try {
@@ -133,10 +154,14 @@ export default function VoiceScreen() {
     }
 
     const audioUri = uri;
-    await submit(async () => {
+    let answer = "";
+    const answered = await submit(async () => {
       const result = await sendVoiceQuery(audioUri, language, region);
+      answer = result.reply.strategy;
       return { question: result.transcript, reply: result.reply };
     });
+    // Asked by voice, answered by voice
+    if (answered) startSpeaking(answer);
   };
 
   // Runs one request at a time. On failure the previous question and reply stay on screen.
@@ -145,6 +170,7 @@ export default function VoiceScreen() {
   ): Promise<boolean> => {
     if (busyRef.current) return false;
     busyRef.current = true;
+    stopAnswer();
     setIsLoading(true);
     setError(null);
     try {
@@ -244,8 +270,15 @@ export default function VoiceScreen() {
           </View>
         )}
 
-        {/* Nothing asked yet: a quiet field picture, and the mic below invites the first question */}
-        {transcript === "" && !reply && <FieldIllustration style={styles.field} />}
+        {/* Nothing asked yet: example questions show what the assistant can answer */}
+        {transcript === "" && !reply && (
+          <View style={styles.block}>
+            <Text style={styles.label}>{t("voice.tryAsking")}</Text>
+            {SUGGESTIONS.map((key) => (
+              <SuggestionRow key={key} text={t(key)} onPress={() => askText(t(key))} disabled={isLoading || isRecording} />
+            ))}
+          </View>
+        )}
 
         {transcript !== "" && (
           <FadeInView style={styles.block}>
@@ -310,55 +343,64 @@ export default function VoiceScreen() {
               icon="lightbulb-on-outline"
               text={reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
             />
+            <Button
+              label={isSpeaking ? t("voice.stopSpeaking") : t("voice.listen")}
+              icon={isSpeaking ? "stop" : "volume-high"}
+              variant="secondary"
+              onPress={isSpeaking ? stopAnswer : () => startSpeaking(reply.strategy)}
+              style={styles.listenButton}
+            />
             <AnswerText text={reply.strategy} />
           </FadeInView>
         )}
       </ScrollView>
 
       <View style={styles.dock}>
-        <Text style={styles.hint} accessibilityLiveRegion="polite">
-          {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
-        </Text>
+        <View style={styles.micRow}>
+          <Text style={styles.hint} accessibilityLiveRegion="polite">
+            {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
+          </Text>
 
-        <View style={styles.micWrap}>
-          {isRecording && !reduceMotion && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.pulse,
-                {
-                  opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
-                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
-                },
-              ]}
-            />
-          )}
-          {isLoading && (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.arc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }]}
-            >
-              <Svg width={ARC} height={ARC}>
-                <Circle cx={ARC / 2} cy={ARC / 2} r={ARC / 2 - 3} stroke={colors.secondary} strokeWidth={3}
-                        strokeDasharray="80 600" strokeLinecap="round" fill="none" />
-              </Svg>
-            </Animated.View>
-          )}
-          <View style={[styles.ring, { borderColor: micTone }]}>
-            <PressableScale
-              style={[styles.mic, { backgroundColor: micTone }]}
-              onPress={isRecording ? stopRecording : startRecording}
-              disabled={isLoading}
-              accessibilityRole="button"
-              accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
-              accessibilityState={{ disabled: isLoading, busy: isLoading }}
-            >
-              <MaterialCommunityIcons
-                name={isRecording ? "stop" : isLoading ? "dots-horizontal" : "microphone"}
-                size={52}
-                color={colors.onPrimary}
+          <View style={styles.micWrap}>
+            {isRecording && !reduceMotion && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pulse,
+                  {
+                    opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+                  },
+                ]}
               />
-            </PressableScale>
+            )}
+            {isLoading && (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.arc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }]}
+              >
+                <Svg width={ARC} height={ARC}>
+                  <Circle cx={ARC / 2} cy={ARC / 2} r={ARC / 2 - 3} stroke={colors.secondary} strokeWidth={3}
+                          strokeDasharray="80 600" strokeLinecap="round" fill="none" />
+                </Svg>
+              </Animated.View>
+            )}
+            <View style={[styles.ring, { borderColor: micTone }]}>
+              <PressableScale
+                style={[styles.mic, { backgroundColor: micTone }]}
+                onPress={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
+                accessibilityState={{ disabled: isLoading, busy: isLoading }}
+              >
+                <MaterialCommunityIcons
+                  name={isRecording ? "stop" : isLoading ? "dots-horizontal" : "microphone"}
+                  size={44}
+                  color={colors.onPrimary}
+                />
+              </PressableScale>
+            </View>
           </View>
         </View>
 
@@ -392,6 +434,22 @@ export default function VoiceScreen() {
 // Dictionary labels end with ":" for the old layout; beside a value the colon is dropped
 function asLabel(text: string): string {
   return text.replace(/:\s*$/, "");
+}
+
+function SuggestionRow({ text, onPress, disabled }: { text: string; onPress: () => void; disabled: boolean }) {
+  return (
+    <PressableScale
+      style={[styles.suggestion, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={text}
+      accessibilityState={{ disabled }}
+    >
+      <MaterialCommunityIcons name="message-text-outline" size={22} color={colors.primary} />
+      <Text style={styles.suggestionText}>{text}</Text>
+    </PressableScale>
+  );
 }
 
 function BlockTitle({ icon, text }: { icon: IconName; text: string }) {
@@ -454,7 +512,11 @@ const styles = StyleSheet.create({
   regionRow:     { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   regionText:    { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
 
-  field:         { marginTop: "auto", height: 140, opacity: 0.6 },
+  suggestion:    { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg,
+                   paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: colors.card,
+                   borderWidth: 1, borderColor: colors.glassBorder },
+  suggestionText: { ...type.body, color: colors.text, flex: 1 },
+  listenButton:  { alignSelf: "flex-start" },
 
   errorPanel:    { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md,
                    borderRadius: radius.sm, backgroundColor: colors.dangerBg },
@@ -488,9 +550,10 @@ const styles = StyleSheet.create({
   paragraphGap:  { height: spacing.md },
 
   // Fixed controls under the scrolling answer
-  dock:          { alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+  dock:          { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
                    paddingBottom: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider },
-  hint:          { ...type.body, fontFamily: fonts.bold, color: colors.text, textAlign: "center" },
+  micRow:        { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  hint:          { ...type.body, fontFamily: fonts.bold, color: colors.text, flex: 1 },
   micWrap:       { width: ARC, height: ARC, alignItems: "center", justifyContent: "center" },
   pulse:         { position: "absolute", width: RING, height: RING, borderRadius: RING / 2, backgroundColor: colors.danger },
   arc:           { position: "absolute", width: ARC, height: ARC },
@@ -498,7 +561,7 @@ const styles = StyleSheet.create({
   mic:           { width: MIC, height: MIC, borderRadius: MIC / 2, alignItems: "center", justifyContent: "center",
                    borderTopWidth: 1, borderTopColor: colors.sheen },
 
-  typeBar:       { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm, alignSelf: "stretch" },
+  typeBar:       { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
   input:         { flex: 1, minHeight: 52, maxHeight: 120, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
                    borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
                    ...type.body, color: colors.text },

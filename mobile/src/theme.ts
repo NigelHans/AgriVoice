@@ -1,64 +1,81 @@
 /**
- * AgriVoice V2 "Premium Agritech" design tokens — dark first.
+ * AgriVoice V3 "Daylight price board" design tokens — light, for reading in the sun.
+ * One bold element per screen: the number a farmer acts on, set in condensed sign lettering.
  *
- * Contrast rules (WCAG, measured): every text color passes 4.5:1 on `background` and `card`.
- * Earth Brown (`earth`, `decor`) and Moss (`surfaceRaised`) fail as text: use them only for
- * surfaces, lines, textures and illustrations. Words on Warm Clay use `onPrimary` (dark).
- * Token names from V1 are kept, so every screen keeps working while it is redesigned.
+ * Contrast (WCAG, measured): every text color passes 4.5:1 on background, card, surfaceRaised,
+ * sand and the three status backgrounds. Earth Brown is for edges and rules only.
+ * Words on filled leaf / ember / amber controls use `onPrimary` (white).
+ * The V2 night values are in git (commit 4d8bb86) for a later Night theme.
  */
 export const colors = {
-  // Brand accents: clay leads, brown supports, greens stay calm (no neon)
-  primary: "#C2A47C",        // Warm Clay: active states, primary buttons, key numbers
-  secondary: "#8DB58A",      // Sage: secondary actions, neutral icons
-  accent: "#C2A47C",         // small accent text (dates, sources); brown is too dark for text here
-  earth: "#806044",          // Earth Brown: lines, timeline rails, textures — not for text
+  // Accents
+  primary: "#2F6B3A",        // Leaf: main actions, active states, icons
+  secondary: "#386449",      // darker sage: secondary icons, processing state
+  accent: "#7A5530",         // small accent text (dates, sources)
+  price: "#7A5530",          // Price brown: prices and key numbers
+  earth: "#806044",          // Earth Brown: board edges, rules, timeline rails — not for text
   decor: "#806044",          // illustrations only — not for text
-  sand: "#30483A",           // neutral panels (was Soft Sand in V1)
-  onPrimary: "#111B17",      // text and icons on clay / sage / ember fills
+  sand: "#DCE3D5",           // neutral panels and badges
+  onPrimary: "#FFFFFF",      // text and icons on leaf / ember / amber fills
 
-  // Surfaces: layered greens, never pure black
-  background: "#111B17",     // Midnight Forest
-  card: "#1D3027",           // Deep Olive
-  surfaceRaised: "#30483A",  // Moss: raised, pressed or selected surfaces
-  glass: "rgba(29, 48, 39, 0.72)",        // translucent Deep Olive for floating UI
-  glassBorder: "rgba(216, 208, 189, 0.12)",
-  highlight: "rgba(216, 208, 189, 0.08)", // 1px top edge that gives cards depth
-  sheen: "rgba(255, 255, 255, 0.25)",     // glossy top edge on solid clay / ember controls
-  scrim: "rgba(0, 0, 0, 0.55)",           // dims the screen behind sheets and overlays
+  // Surfaces
+  background: "#E8EDE3",     // Field: pale leaf-grey, softer than white in the sun
+  card: "#F7F9F4",           // Paper: boards, cards, inputs
+  surfaceRaised: "#DCE5D6",  // selected or pressed surfaces
+  glass: "rgba(247, 249, 244, 0.94)",     // floating bars (tab bar)
+  glassBorder: "rgba(23, 39, 29, 0.12)",
+  highlight: "rgba(255, 255, 255, 0.7)",  // 1px top edge on cards
+  sheen: "rgba(255, 255, 255, 0.3)",      // glossy top edge on the mic button
+  scrim: "rgba(23, 39, 29, 0.45)",        // dims the screen behind sheets
 
   // Text
-  text: "#D8D0BD",           // Natural Linen
-  textSecondary: "#A7B0A1",
-  textMuted: "#A7B0A1",
-  textFaint: "#A7B0A1",
+  text: "#17271D",           // Ink
+  textSecondary: "#4A5A4E",
+  textMuted: "#4A5A4E",
+  textFaint: "#4A5A4E",
 
   // Lines
-  border: "#74826F",         // input and control outlines (≥ 3:1 on card and background)
-  divider: "rgba(216, 208, 189, 0.12)",
+  border: "#6E7D71",         // input and control outlines (≥ 3:1 on every surface)
+  divider: "rgba(23, 39, 29, 0.12)",
 
   // Status
-  success: "#8DB58A",
-  successBg: "#243B2C",
-  danger: "#E58A6E",         // Ember: recording, errors, delete
-  dangerBg: "#3D2620",
-  warning: "#E3A84B",        // Amber: warnings (readable as text on dark)
-  warningText: "#E3A84B",
-  warningBg: "#3A2F1A",
-  notice: "#D8D0BD",
-  noticeBg: "#30483A",
+  success: "#2F6B3A",
+  successBg: "#D9EAD5",
+  danger: "#A23B24",         // Ember: recording, errors, delete, low offers
+  dangerBg: "#F7E0D8",
+  warning: "#845500",        // Amber
+  warningText: "#845500",
+  warningBg: "#F5E7C8",
+  notice: "#17271D",
+  noticeBg: "#DCE3D5",
 
-  shadow: "#000000",
+  shadow: "#17271D",
 };
 
-/** Refined scale: large numbers for prices and temperatures, a letter-spaced overline for labels. */
+/**
+ * Font files in assets/fonts (SIL Open Font License), loaded in App.tsx.
+ * Custom fonts ignore fontWeight on Android, so bold text uses the bold family instead.
+ * Neither family has the peso sign: big prices draw ₱ separately (components/PriceText).
+ */
+export const fonts = {
+  regular: "AtkinsonHyperlegible-Regular",  // body: designed for low-vision readers
+  bold: "AtkinsonHyperlegible-Bold",
+  display: "BarlowCondensed-ExtraBold",     // prices, temperatures, titles: market-sign lettering
+  displaySemi: "BarlowCondensed-SemiBold",
+};
+
+/**
+ * Scale 14 / 18 / 22 / 30 / 56. Line heights stay ≥ 1.25× the size (both fonts need ~1.24),
+ * so Android never clips tall numbers. Labels are sentence case, never all caps.
+ */
 export const type = {
-  overline:  { fontSize: 12, lineHeight: 16, letterSpacing: 1.2, fontWeight: "700" as const, textTransform: "uppercase" as const },
-  caption:   { fontSize: 14, lineHeight: 20 },
-  body:      { fontSize: 16, lineHeight: 24 },
-  bodyLarge: { fontSize: 18, lineHeight: 26 },
-  title:     { fontSize: 20, lineHeight: 28 },
-  headline:  { fontSize: 28, lineHeight: 34, letterSpacing: -0.3 },
-  display:   { fontSize: 40, lineHeight: 50, letterSpacing: -0.4 },
+  overline:  { fontSize: 14, lineHeight: 20, fontFamily: fonts.bold },   // small label beside or under a value
+  caption:   { fontSize: 14, lineHeight: 20, fontFamily: fonts.regular },
+  body:      { fontSize: 18, lineHeight: 26, fontFamily: fonts.regular },
+  bodyLarge: { fontSize: 18, lineHeight: 28, fontFamily: fonts.regular },
+  title:     { fontSize: 22, lineHeight: 28, fontFamily: fonts.regular },
+  headline:  { fontSize: 30, lineHeight: 38, fontFamily: fonts.display },
+  display:   { fontSize: 56, lineHeight: 70, fontFamily: fonts.display, fontVariant: ["tabular-nums" as const] },
 };
 
 export const spacing = {
@@ -83,13 +100,13 @@ export const touch = {
   min: 48,
 };
 
-/** Depth on dark comes from a light top edge plus a soft shadow (Android shadows are faint on dark). */
+/** In daylight, edges do most of the work; the shadow only lifts cards slightly off the page. */
 export const cardShadow = {
   shadowColor: colors.shadow,
-  shadowOpacity: 0.35,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 4,
+  shadowOpacity: 0.08,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
 };
 
 /** Short, consistent motion. Everything non-essential turns off with the phone's reduce-motion setting. */

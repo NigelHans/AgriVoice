@@ -6,7 +6,7 @@ import React from "react";
 import { Text, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PressableScale from "./PressableScale";
-import { colors, radius, spacing, touch, type } from "../theme";
+import { colors, radius, spacing, touch, type, fonts } from "../theme";
 
 type Props = {
   label: string;
@@ -38,5 +38,5 @@ const styles = StyleSheet.create({
               borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.card },
   selected: { backgroundColor: colors.primary, borderColor: colors.primary },
   icon:     { marginRight: spacing.xs },
-  label:    { ...type.body, fontWeight: "600" },
+  label:    { ...type.body, fontFamily: fonts.bold },
 });

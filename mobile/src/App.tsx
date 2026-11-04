@@ -4,11 +4,12 @@
  */
 
 import React from "react";
-import { NavigationContainer, DarkTheme } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useFonts } from "expo-font";
 import { LanguageProvider } from "./context/LanguageContext";
 import { RegionProvider } from "./context/RegionContext";
 import { useT } from "./i18n";
@@ -21,7 +22,7 @@ import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import { withFocusFade } from "./components/FocusFade";
-import { colors, type } from "./theme";
+import { colors, type, fonts } from "./theme";
 
 const Tab = createBottomTabNavigator();
 
@@ -40,11 +41,11 @@ const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Settings: "cog-outline",
 };
 
-// Dark navigation theme: screen backgrounds and borders behind every tab follow the V2 palette
+// Light navigation theme: screen backgrounds and borders behind every tab follow the Day palette
 const NAV_THEME = {
-  ...DarkTheme,
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...DefaultTheme.colors,
     primary: colors.primary,
     background: colors.background,
     card: colors.card,
@@ -54,12 +55,22 @@ const NAV_THEME = {
 };
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    [fonts.regular]: require("../assets/fonts/AtkinsonHyperlegible-Regular.ttf"),
+    [fonts.bold]: require("../assets/fonts/AtkinsonHyperlegible-Bold.ttf"),
+    [fonts.display]: require("../assets/fonts/BarlowCondensed-ExtraBold.ttf"),
+    [fonts.displaySemi]: require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
+  });
+  // shortcut: renders nothing for the moment the fonts load, add expo-splash-screen if a blank frame shows.
+  // If loading fails the app still opens, in the phone's own font.
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
       <LanguageProvider>
       <RegionProvider>
       <NavigationContainer theme={NAV_THEME}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <AppTabs />
       </NavigationContainer>
       </RegionProvider>
@@ -79,7 +90,7 @@ function AppTabs() {
             headerStyle: { backgroundColor: colors.background },
             headerShadowVisible: false,
             headerTintColor: colors.text,
-            headerTitleStyle: { ...type.title, fontWeight: "700" },
+            headerTitleStyle: { fontFamily: fonts.display, fontSize: 26 },
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.textSecondary,
             tabBarIcon: ({ color, focused }) => (

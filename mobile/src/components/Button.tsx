@@ -9,7 +9,7 @@ import React from "react";
 import { Text, ActivityIndicator, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PressableScale from "./PressableScale";
-import { colors, radius, spacing, touch, type } from "../theme";
+import { colors, radius, spacing, touch, type, fonts } from "../theme";
 
 type Variant = "primary" | "secondary" | "text" | "danger";
 
@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
   danger:    { paddingHorizontal: spacing.md },
   inactive:  { opacity: 0.45 },
   icon:      { marginRight: spacing.sm },
-  label:     { ...type.body, fontWeight: "700" },
+  label:     { ...type.body, fontFamily: fonts.bold },
 });

@@ -12,7 +12,7 @@ import BottomSheet from "../components/BottomSheet";
 import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
 import StatusView from "../components/StatusView";
-import { colors, spacing, radius, type } from "../theme";
+import { colors, spacing, radius, type, fonts } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -204,9 +204,9 @@ const styles = StyleSheet.create({
   iconCircle:         { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
                         backgroundColor: colors.background },
   overline:           { ...type.overline, color: colors.textSecondary },
-  tileValue:          { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexGrow: 1 },
+  tileValue:          { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flexGrow: 1 },
   tileAction:         { flexDirection: "row", alignItems: "center", gap: 2 },
-  tileActionText:     { ...type.body, fontWeight: "700", color: colors.primary },
+  tileActionText:     { ...type.body, fontFamily: fonts.bold, color: colors.primary },
 
   info:               { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
   infoBody:           { flex: 1, gap: spacing.xs },
@@ -215,12 +215,12 @@ const styles = StyleSheet.create({
   about:              { gap: spacing.sm },
   aboutHead:          { flexDirection: "row", alignItems: "center", gap: spacing.md },
   aboutText:          { flex: 1 },
-  aboutName:          { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  aboutName:          { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
   aboutTech:          { ...type.caption, color: colors.accent },
 
   sheetBody:          { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },
   sheetHeader:        { paddingHorizontal: spacing.lg, gap: spacing.sm },
-  sheetTitle:         { ...type.title, fontWeight: "700", color: colors.text },
+  sheetTitle:         { ...type.title, fontFamily: fonts.bold, color: colors.text },
   sheetHint:          { ...type.caption, color: colors.textSecondary, marginBottom: spacing.xs },
   searchBox:          { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, minHeight: 52,
                         borderRadius: radius.lg, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
@@ -234,5 +234,5 @@ const styles = StyleSheet.create({
                         borderRadius: radius.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.glassBorder },
   optionSelected:     { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
   optionText:         { ...type.body, color: colors.text, flex: 1 },
-  optionTextSelected: { fontWeight: "700" },
+  optionTextSelected: { fontFamily: fonts.bold },
 });

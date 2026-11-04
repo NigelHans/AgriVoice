@@ -16,7 +16,7 @@ export default function Surface({ variant = "base", style, ...props }: Props) {
 
 const styles = StyleSheet.create({
   surface: { borderRadius: radius.lg, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.highlight },
-  base:    { backgroundColor: colors.card, ...cardShadow },
+  base:    { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder, ...cardShadow },
   raised:  { backgroundColor: colors.surfaceRaised, ...cardShadow },
   glass:   { backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder },
 });

@@ -5,7 +5,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors, radius, spacing, type } from "../theme";
+import { colors, radius, spacing, type, fonts } from "../theme";
 
 type Tone = "success" | "warning" | "danger" | "neutral";
 
@@ -36,5 +36,5 @@ const styles = StyleSheet.create({
   badge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center",
            paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill },
   icon:  { marginRight: spacing.xs },
-  label: { ...type.caption, fontWeight: "700" },
+  label: { ...type.caption, fontFamily: fonts.bold },
 });

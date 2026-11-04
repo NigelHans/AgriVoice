@@ -6,7 +6,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "./Button";
 import Skeleton from "./Skeleton";
-import { colors, radius, spacing, type } from "../theme";
+import { colors, radius, spacing, type, fonts } from "../theme";
 
 type Props = {
   loading?: boolean;
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   iconCircle:      { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
                      backgroundColor: colors.surfaceRaised },
   iconCircleError: { backgroundColor: colors.dangerBg },
-  title:           { ...type.title, fontWeight: "700", color: colors.text, marginTop: spacing.lg, textAlign: "center" },
+  title:           { ...type.title, fontFamily: fonts.bold, color: colors.text, marginTop: spacing.lg, textAlign: "center" },
   titleError:      { color: colors.danger },
   text:            { ...type.body, color: colors.textSecondary, marginTop: spacing.sm, textAlign: "center" },
   detail:          { ...type.caption, color: colors.textMuted, marginTop: spacing.sm, textAlign: "center" },

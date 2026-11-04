@@ -18,7 +18,7 @@ import SectionHeader from "../components/SectionHeader";
 import FadeInView from "../components/FadeInView";
 import GradientFill from "../components/GradientFill";
 import PressableScale from "../components/PressableScale";
-import { colors, spacing, radius, type } from "../theme";
+import { colors, spacing, radius, type, fonts } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   container:     { flex: 1, backgroundColor: colors.background },
   content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   locationRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  location:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexShrink: 1 },
+  location:      { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flexShrink: 1 },
 
   notice:        { gap: spacing.md },
   noticeRow:     { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
                    backgroundColor: colors.warningBg, borderWidth: 1, borderColor: colors.warning },
   warningIcon:   { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: colors.warning },
   warningBody:   { flex: 1 },
-  warningTitle:  { ...type.bodyLarge, fontWeight: "700", color: colors.warningText },
+  warningTitle:  { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.warningText },
   warningText:   { ...type.caption, color: colors.text },
 
   hero:          { borderRadius: radius.xl, padding: spacing.xl, overflow: "hidden", gap: spacing.md,
@@ -518,13 +518,13 @@ const styles = StyleSheet.create({
   heroSevere:    { borderColor: colors.warning },
   // Day name and date side by side on one baseline (not nested, so neither clips the other)
   titleRow:      { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
-  heroTitle:     { ...type.title, fontWeight: "700", color: colors.text },
+  heroTitle:     { ...type.title, fontFamily: fonts.bold, color: colors.text },
   heroSub:       { ...type.caption, color: colors.textSecondary },
   heroMain:      { flexDirection: "row", alignItems: "center", gap: spacing.md },
   heroInfo:      { flex: 1 },
   tempRow:       { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
-  heroTemp:      { ...type.display, fontWeight: "700", color: colors.text },
-  heroMin:       { ...type.title, fontWeight: "600", color: colors.textSecondary },
+  heroTemp:      { ...type.display, color: colors.text },
+  heroMin:       { ...type.title, fontFamily: fonts.bold, color: colors.textSecondary },
   heroDesc:      { ...type.bodyLarge, color: colors.textSecondary },
 
   timeline:      { gap: spacing.md },
@@ -534,24 +534,24 @@ const styles = StyleSheet.create({
                    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder },
   pillActive:    { backgroundColor: colors.surfaceRaised, borderColor: colors.primary },
   pillSevere:    { borderColor: colors.warning },
-  pillDay:       { ...type.caption, fontWeight: "600", color: colors.textSecondary, textAlign: "center" },
+  pillDay:       { ...type.caption, fontFamily: fonts.bold, color: colors.textSecondary, textAlign: "center" },
   pillDayActive: { color: colors.text },
-  pillTemp:      { ...type.title, fontWeight: "700", color: colors.text },
+  pillTemp:      { ...type.title, fontFamily: fonts.bold, color: colors.text },
   pillRainRow:   { flexDirection: "row", alignItems: "center", gap: 2 },
-  pillRain:      { ...type.caption, fontWeight: "600", color: colors.textSecondary },
+  pillRain:      { ...type.caption, fontFamily: fonts.bold, color: colors.textSecondary },
 
   detail:        { gap: spacing.md },
-  detailTitle:   { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  detailTitle:   { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
   detailMain:    { flexDirection: "row", alignItems: "center", gap: spacing.md },
   detailInfo:    { flex: 1 },
   detailDesc:    { ...type.body, color: colors.text },
-  detailTemp:    { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  detailTemp:    { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
 
   severeEdge:    { borderLeftWidth: 3, borderLeftColor: colors.warning },
-  severeText:    { color: colors.warningText, fontWeight: "700" },
+  severeText:    { color: colors.warningText, fontFamily: fonts.bold },
 
   stats:         { flexDirection: "row", gap: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider },
   stat:          { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   statLabel:     { ...type.caption, color: colors.textSecondary },
-  statValue:     { ...type.body, fontWeight: "700", color: colors.text },
+  statValue:     { ...type.body, fontFamily: fonts.bold, color: colors.text },
 });

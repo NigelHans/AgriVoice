@@ -17,7 +17,7 @@ import Badge from "../components/Badge";
 import BottomSheet from "../components/BottomSheet";
 import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
-import { colors, spacing, radius, type } from "../theme";
+import { colors, spacing, radius, type, fonts } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
 
@@ -294,11 +294,11 @@ const styles = StyleSheet.create({
   metaRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
   timeRow:         { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   time:            { ...type.caption, color: colors.textSecondary },
-  question:        { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  question:        { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
   answerRow:       { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   answer:          { ...type.body, color: colors.textSecondary, flex: 1 },
   viewRow:         { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", minHeight: 32 },
-  viewText:        { ...type.body, fontWeight: "700", color: colors.primary },
+  viewText:        { ...type.body, fontFamily: fonts.bold, color: colors.primary },
 
   actionError:     { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.sm,
                      padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
@@ -309,6 +309,6 @@ const styles = StyleSheet.create({
   detailCard:      { gap: spacing.sm },
   replyCard:       { borderLeftWidth: 3, borderLeftColor: colors.primary },
   detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  detailTitle:     { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
+  detailTitle:     { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flex: 1 },
   detailText:      { ...type.body, color: colors.text },
 });

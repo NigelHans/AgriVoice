@@ -6,7 +6,7 @@ import React from "react";
 import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Surface from "./Surface";
-import { colors, spacing, type } from "../theme";
+import { colors, spacing, type, fonts } from "../theme";
 
 type Props = {
   label: string;
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
   tile:   { flex: 1, minHeight: 96, justifyContent: "space-between", gap: spacing.sm },
   head:   { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   label:  { ...type.overline, color: colors.textSecondary, flexShrink: 1 },
-  value:  { fontWeight: "700" },
+  value:  { fontFamily: fonts.bold },
   small:  { ...type.bodyLarge },
   normal: { ...type.title, fontSize: 22 },
   large:  { ...type.headline },

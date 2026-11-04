@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { colors, spacing, type } from "../theme";
+import { colors, spacing, type, fonts } from "../theme";
 
 type Props = {
   title: string;
@@ -21,6 +21,6 @@ export default function SectionHeader({ title, hint }: Props) {
 
 const styles = StyleSheet.create({
   wrap:  { marginTop: spacing.xl, marginBottom: spacing.md },
-  title: { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  title: { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
   hint:  { ...type.caption, color: colors.textMuted, marginTop: spacing.xs },
 });

@@ -20,7 +20,7 @@ import FadeInView from "../components/FadeInView";
 import GradientFill from "../components/GradientFill";
 import PressableScale from "../components/PressableScale";
 import SectionHeader from "../components/SectionHeader";
-import { colors, spacing, radius, type } from "../theme";
+import { colors, spacing, radius, type, fonts } from "../theme";
 
 type Scope = "mine" | "all";
 
@@ -321,17 +321,17 @@ const styles = StyleSheet.create({
   regionTile:    { flexDirection: "row", alignItems: "center", gap: spacing.md },
   regionInfo:    { flex: 1 },
   overline:      { ...type.overline, color: colors.textSecondary },
-  regionValue:   { ...type.bodyLarge, fontWeight: "700", color: colors.text },
-  changeText:    { ...type.body, fontWeight: "700", color: colors.primary },
+  regionValue:   { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
+  changeText:    { ...type.body, fontFamily: fonts.bold, color: colors.primary },
 
   featured:      { borderRadius: radius.xl, padding: spacing.xl, overflow: "hidden", gap: spacing.md,
                    borderWidth: 1, borderColor: colors.glassBorder },
   featuredTop:   { flexDirection: "row", alignItems: "center", gap: spacing.md },
   cropIconLarge: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
   featuredInfo:  { flex: 1 },
-  featuredCrop:  { ...type.headline, fontWeight: "700", color: colors.text },
-  featuredPrice: { ...type.display, fontWeight: "700", color: colors.primary },
-  featuredUnit:  { ...type.body, fontWeight: "600", color: colors.textSecondary },
+  featuredCrop:  { ...type.headline, color: colors.text },
+  featuredPrice: { ...type.display, color: colors.price },
+  featuredUnit:  { ...type.body, fontFamily: fonts.bold, color: colors.textSecondary },
   // Price and unit sit side by side on one baseline; the unit wraps below instead of clipping
   priceRow:      { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
 
@@ -340,9 +340,9 @@ const styles = StyleSheet.create({
   olderCell:     { width: "100%" },
   tile:          { flex: 1, gap: spacing.sm },
   tileTop:       { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  tileCrop:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
-  tilePrice:     { ...type.headline, fontSize: 26, fontWeight: "700", color: colors.primary, flexShrink: 1 },
-  tileUnit:      { ...type.caption, fontWeight: "600", color: colors.textSecondary },
+  tileCrop:      { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flex: 1 },
+  tilePrice:     { ...type.headline, fontSize: 26, color: colors.price, flexShrink: 1 },
+  tileUnit:      { ...type.caption, fontFamily: fonts.bold, color: colors.textSecondary },
   priceLegacy:   { color: colors.textSecondary },
   region:        { ...type.caption, color: colors.textSecondary },
   details:       { gap: spacing.xs, marginTop: spacing.xs },

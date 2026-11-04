@@ -19,43 +19,34 @@ import {
   Animated,
   Easing,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Audio } from "expo-av";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { sendVoiceQuery, sendTextQuery } from "../services/api";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import { useLanguage } from "../context/LanguageContext";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
-import Surface from "../components/Surface";
 import Button from "../components/Button";
-import Badge from "../components/Badge";
-import BentoTile from "../components/BentoTile";
 import FadeInView from "../components/FadeInView";
-import GradientFill from "../components/GradientFill";
 import PressableScale from "../components/PressableScale";
-import Waveform from "../components/Waveform";
+import PriceText from "../components/PriceText";
 import FieldIllustration from "../components/FieldIllustration";
 import { useReduceMotion } from "../components/motion";
 import { appendHistory } from "../services/historyStorage";
 import type { AssistantReply } from "../types";
-import { colors, spacing, radius, type } from "../theme";
+import { colors, spacing, radius, type, fonts } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
-// Ready → Listening → Processing → Answer; the badge shown above the microphone
-const PHASES = {
-  ready:      { key: "voice.stateReady",      tone: "neutral", icon: "microphone-outline" },
-  listening:  { key: "voice.stateListening",  tone: "danger",  icon: "record-circle-outline" },
-  processing: { key: "voice.stateProcessing", tone: "warning", icon: "timer-sand" },
-  answer:     { key: "voice.stateAnswer",     tone: "success", icon: "check-circle-outline" },
-} as const;
-
-const MIC = 156;          // microphone disc
-const RING = MIC + 20;    // clay / ember ring around it
-const ARC = RING + 20;    // processing arc
+const MIC = 112;          // microphone disc (fixed at the bottom, within thumb reach)
+const RING = MIC + 18;    // clay / ember ring around it
+const ARC = RING + 18;    // processing arc
 
 // Errors are stored as keys and translated when shown, so they follow a language change.
 // `typeInstead` adds the "type your question below" hint.
@@ -199,10 +190,10 @@ export default function VoiceScreen() {
   };
 
   // Derived from the existing state; no new logic
-  const phase = isRecording ? "listening" : isLoading ? "processing" : reply ? "answer" : "ready";
   const sendDisabled = isLoading || isRecording || !typedText.trim();
   const micTone = isRecording ? colors.danger : isLoading ? colors.secondary : colors.primary;
   const reduceMotion = useReduceMotion();
+  const headerHeight = useHeaderHeight();
 
   // Ember pulse while listening; a slowly turning arc while processing. Both stop when idle.
   const pulse = useRef(new Animated.Value(0)).current;
@@ -229,116 +220,36 @@ export default function VoiceScreen() {
   }, [isLoading, reduceMotion, spin]);
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.screen}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
     >
-      <FadeInView>
-        <Surface variant="glass" style={styles.contextBar}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.contextBar}>
           <LanguagePicker />
           <View style={styles.regionRow}>
             <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.primary} />
             <Text style={styles.regionText}>{t("voice.regionLine", { region: regionLabel })}</Text>
           </View>
-        </Surface>
-      </FadeInView>
-
-      <FadeInView index={1}>
-        <View style={styles.stage}>
-          <GradientFill from={colors.card} to={colors.background} direction="vertical" />
-          <FieldIllustration style={styles.field} />
-          <Badge label={t(PHASES[phase].key)} tone={PHASES[phase].tone} icon={PHASES[phase].icon} />
-
-          <View style={styles.micWrap}>
-            {isRecording && !reduceMotion && (
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.pulse,
-                  {
-                    opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
-                    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
-                  },
-                ]}
-              />
-            )}
-            {isLoading && (
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.arc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }]}
-              >
-                <Svg width={ARC} height={ARC}>
-                  <Circle cx={ARC / 2} cy={ARC / 2} r={ARC / 2 - 3} stroke={colors.secondary} strokeWidth={3}
-                          strokeDasharray="80 600" strokeLinecap="round" fill="none" />
-                </Svg>
-              </Animated.View>
-            )}
-            <View style={[styles.ring, { borderColor: micTone }]}>
-              <PressableScale
-                style={[styles.mic, { backgroundColor: micTone }]}
-                onPress={isRecording ? stopRecording : startRecording}
-                disabled={isLoading}
-                accessibilityRole="button"
-                accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
-                accessibilityState={{ disabled: isLoading, busy: isLoading }}
-              >
-                <MaterialCommunityIcons
-                  name={isRecording ? "stop" : isLoading ? "dots-horizontal" : "microphone"}
-                  size={68}
-                  color={colors.onPrimary}
-                />
-              </PressableScale>
-            </View>
-          </View>
-
-          <Waveform active={isRecording} />
-          <Text style={styles.hint} accessibilityLiveRegion="polite">
-            {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
-          </Text>
         </View>
-      </FadeInView>
 
-      {error && (
-        <FadeInView>
-          <Surface style={styles.errorCard}>
+        {error && (
+          <View style={styles.errorPanel}>
             <MaterialCommunityIcons name="alert-circle-outline" size={22} color={colors.danger} />
             <Text style={styles.errorText}>
               {t(error.key, error.values)}
               {error.typeInstead ? `\n${t("voice.typeInstead")}` : ""}
             </Text>
-          </Surface>
-        </FadeInView>
-      )}
+          </View>
+        )}
 
-      <Surface variant="glass" style={styles.typeBar}>
-        <TextInput
-          style={styles.input}
-          placeholder={t("voice.typePlaceholder")}
-          placeholderTextColor={colors.textMuted}
-          value={typedText}
-          onChangeText={setTypedText}
-          multiline
-          editable={!isLoading}
-          accessibilityLabel={t("voice.typePlaceholder")}
-        />
-        <PressableScale
-          style={[styles.sendButton, sendDisabled && styles.disabled]}
-          onPress={sendTyped}
-          disabled={sendDisabled}
-          accessibilityRole="button"
-          accessibilityLabel={t("voice.sendLabel")}
-          accessibilityState={{ disabled: sendDisabled }}
-        >
-          <MaterialCommunityIcons name="send" size={22} color={colors.onPrimary} />
-        </PressableScale>
-      </Surface>
+        {/* Nothing asked yet: a quiet field picture, and the mic below invites the first question */}
+        {transcript === "" && !reply && <FieldIllustration style={styles.field} />}
 
-      {transcript !== "" && (
-        <FadeInView style={styles.block}>
-          <Surface>
-            <BlockTitle icon="account-voice" text={t("voice.yourQuestion")} />
+        {transcript !== "" && (
+          <FadeInView style={styles.block}>
+            <Text style={styles.label}>{asLabel(t("voice.yourQuestion"))}</Text>
             {isEditing ? (
               <>
                 <TextInput
@@ -356,49 +267,131 @@ export default function VoiceScreen() {
                 </View>
               </>
             ) : (
-              <>
+              <View style={styles.questionRow}>
                 <Text style={styles.questionText} selectable>"{transcript}"</Text>
-                <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing}
-                        disabled={isLoading} style={styles.editButton} />
-              </>
+                <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+              </View>
             )}
-          </Surface>
-        </FadeInView>
-      )}
+          </FadeInView>
+        )}
 
-      {reply && reply.mode === "negotiation" && (
-        <FadeInView index={1} style={styles.block}>
-          <BlockTitle icon="scale-balance" text={t("voice.analysisTitle", { region: regionLabel })} />
-          <View style={styles.bentoRow}>
-            <BentoTile label={t("voice.offer")} value={formatPeso(reply.extracted_data.offer_per_kg, " / kg")}
-                       valueColor={colors.danger} icon="hand-coin-outline" />
-            <BentoTile label={priceLabel(reply, t)} value={formatPeso(reply.fair_price_per_kg, " / kg")}
-                       valueColor={colors.success} icon="check-decagram-outline" />
-          </View>
-          {reply.total_market_value !== null && (
-            <BentoTile label={t("voice.totalValue")} value={`₱${reply.total_market_value.toLocaleString()}`}
-                       valueColor={colors.primary} size="large" icon="cash-multiple" variant="raised" style={styles.wideTile} />
-          )}
-          <View style={styles.bentoRow}>
-            <BentoTile label={t("voice.crop")} value={reply.extracted_data.crop ?? "—"} size="small" icon="sprout" />
-            <BentoTile label={t("voice.weight")} value={formatNumber(reply.extracted_data.weight, " kg")} size="small" icon="weight-kilogram" />
-          </View>
-        </FadeInView>
-      )}
+        {reply && reply.mode === "negotiation" && (
+          <FadeInView index={1} style={styles.block}>
+            <BlockTitle icon="scale-balance" text={t("voice.analysisTitle", { region: regionLabel })} />
+            <View style={styles.board}>
+              <View style={styles.boardHead}>
+                <Text style={styles.boardCrop} accessibilityLabel={`${asLabel(t("voice.crop"))}: ${reply.extracted_data.crop ?? "—"}`}>
+                  {reply.extracted_data.crop ?? "—"}
+                </Text>
+                <Text style={styles.boardWeight} accessibilityLabel={`${asLabel(t("voice.weight"))}: ${formatNumber(reply.extracted_data.weight, " kg")}`}>
+                  {formatNumber(reply.extracted_data.weight, " kg")}
+                </Text>
+              </View>
+              <Text style={styles.boardLabel}>{asLabel(priceLabel(reply, t))}</Text>
+              <PriceText value={reply.fair_price_per_kg} unit="kg" />
+              <View style={styles.boardRule} />
+              <View style={styles.boardRow}>
+                <Text style={styles.boardRowLabel}>{asLabel(t("voice.offer"))}</Text>
+                <PriceText value={reply.extracted_data.offer_per_kg} unit="kg" size="headline" color={colors.danger} />
+              </View>
+              {reply.total_market_value !== null && (
+                <View style={styles.boardRow}>
+                  <Text style={styles.boardRowLabel}>{asLabel(t("voice.totalValue"))}</Text>
+                  <PriceText value={reply.total_market_value} size="headline" color={colors.text} />
+                </View>
+              )}
+            </View>
+          </FadeInView>
+        )}
 
-      {reply && (
-        <FadeInView index={2} style={styles.block}>
-          <Surface style={styles.answerCard}>
+        {reply && (
+          <FadeInView index={2} style={styles.block}>
             <BlockTitle
               icon="lightbulb-on-outline"
               text={reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
             />
             <AnswerText text={reply.strategy} />
-          </Surface>
-        </FadeInView>
-      )}
-    </ScrollView>
+          </FadeInView>
+        )}
+      </ScrollView>
+
+      <View style={styles.dock}>
+        <Text style={styles.hint} accessibilityLiveRegion="polite">
+          {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
+        </Text>
+
+        <View style={styles.micWrap}>
+          {isRecording && !reduceMotion && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                {
+                  opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+                },
+              ]}
+            />
+          )}
+          {isLoading && (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.arc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }]}
+            >
+              <Svg width={ARC} height={ARC}>
+                <Circle cx={ARC / 2} cy={ARC / 2} r={ARC / 2 - 3} stroke={colors.secondary} strokeWidth={3}
+                        strokeDasharray="80 600" strokeLinecap="round" fill="none" />
+              </Svg>
+            </Animated.View>
+          )}
+          <View style={[styles.ring, { borderColor: micTone }]}>
+            <PressableScale
+              style={[styles.mic, { backgroundColor: micTone }]}
+              onPress={isRecording ? stopRecording : startRecording}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
+              accessibilityState={{ disabled: isLoading, busy: isLoading }}
+            >
+              <MaterialCommunityIcons
+                name={isRecording ? "stop" : isLoading ? "dots-horizontal" : "microphone"}
+                size={52}
+                color={colors.onPrimary}
+              />
+            </PressableScale>
+          </View>
+        </View>
+
+        <View style={styles.typeBar}>
+          <TextInput
+            style={styles.input}
+            placeholder={t("voice.typePlaceholder")}
+            placeholderTextColor={colors.textMuted}
+            value={typedText}
+            onChangeText={setTypedText}
+            multiline
+            editable={!isLoading}
+            accessibilityLabel={t("voice.typePlaceholder")}
+          />
+          <PressableScale
+            style={[styles.sendButton, sendDisabled && styles.disabled]}
+            onPress={sendTyped}
+            disabled={sendDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={t("voice.sendLabel")}
+            accessibilityState={{ disabled: sendDisabled }}
+          >
+            <MaterialCommunityIcons name="send" size={22} color={colors.onPrimary} />
+          </PressableScale>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
+}
+
+// Dictionary labels end with ":" for the old layout; beside a value the colon is dropped
+function asLabel(text: string): string {
+  return text.replace(/:\s*$/, "");
 }
 
 function BlockTitle({ icon, text }: { icon: IconName; text: string }) {
@@ -437,10 +430,6 @@ function formatNumber(value: number | null, suffix = ""): string {
   return value === null ? "—" : `${value.toLocaleString()}${suffix}`;
 }
 
-function formatPeso(value: number | null, suffix = ""): string {
-  return value === null ? "—" : `₱${value.toLocaleString()}${suffix}`;
-}
-
 // Only call a price "UN-WFP" when the backend actually found one
 function priceLabel(reply: AssistantReply, t: Translate): string {
   switch (reply.price_status) {
@@ -458,48 +447,61 @@ function priceLabel(reply: AssistantReply, t: Translate): string {
 
 const styles = StyleSheet.create({
   screen:        { flex: 1, backgroundColor: colors.background },
-  container:     { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
+  scroll:        { flex: 1 },
+  container:     { flexGrow: 1, padding: spacing.lg, gap: spacing.xl },
 
-  contextBar:    { gap: spacing.md },
-  regionRow:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  contextBar:    { gap: spacing.sm },
+  regionRow:     { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   regionText:    { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
 
-  stage:         { alignItems: "center", gap: spacing.md, paddingVertical: spacing.xl, paddingHorizontal: spacing.lg,
-                   borderRadius: radius.xl, overflow: "hidden", borderWidth: 1, borderColor: colors.glassBorder },
-  field:         { position: "absolute", left: 0, right: 0, bottom: 0, height: 140, opacity: 0.6 },
-  micWrap:       { width: ARC + 24, height: ARC + 24, alignItems: "center", justifyContent: "center" },
-  pulse:         { position: "absolute", width: RING, height: RING, borderRadius: RING / 2, backgroundColor: colors.danger },
-  arc:           { position: "absolute", width: ARC, height: ARC },
-  ring:          { width: RING, height: RING, borderRadius: RING / 2, borderWidth: 2, alignItems: "center", justifyContent: "center",
-                   backgroundColor: colors.glass },
-  mic:           { width: MIC, height: MIC, borderRadius: MIC / 2, alignItems: "center", justifyContent: "center",
-                   borderTopWidth: 1, borderTopColor: colors.sheen },
-  hint:          { ...type.bodyLarge, fontWeight: "600", color: colors.text, textAlign: "center" },
+  field:         { marginTop: "auto", height: 140, opacity: 0.6 },
 
-  errorCard:     { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, backgroundColor: colors.dangerBg },
+  errorPanel:    { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md,
+                   borderRadius: radius.sm, backgroundColor: colors.dangerBg },
   errorText:     { ...type.body, color: colors.danger, flex: 1 },
 
-  typeBar:       { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.xl },
-  input:         { flex: 1, minHeight: 52, maxHeight: 140, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-                   borderRadius: radius.lg, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
+  block:         { gap: spacing.sm },
+  label:         { ...type.overline, color: colors.textSecondary },
+  questionRow:   { gap: spacing.xs },
+  questionText:  { ...type.bodyLarge, color: colors.text },
+  editInput:     { flex: 0 },
+  editActions:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.sm },
+
+  blockTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  blockTitle:    { ...type.body, fontFamily: fonts.bold, color: colors.text, flex: 1 },
+
+  // The price board: one placard per answer, edged in earth like a cardboard sign
+  board:         { padding: spacing.lg, borderRadius: radius.sm, backgroundColor: colors.card,
+                   borderWidth: 2, borderColor: colors.earth, gap: spacing.xs },
+  boardHead:     { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.md,
+                   marginBottom: spacing.sm },
+  boardCrop:     { ...type.headline, color: colors.text, flexShrink: 1 },
+  boardWeight:   { ...type.body, color: colors.textSecondary },
+  boardLabel:    { ...type.overline, color: colors.textSecondary },
+  boardRule:     { height: 1, backgroundColor: colors.earth, marginVertical: spacing.md },
+  boardRow:      { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: spacing.sm },
+  boardRowLabel: { ...type.body, color: colors.textSecondary, flexShrink: 1 },
+
+  answerText:    { ...type.bodyLarge, color: colors.text, flex: 1 },
+  bulletRow:     { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  bulletDot:     { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.primary },
+  paragraphGap:  { height: spacing.md },
+
+  // Fixed controls under the scrolling answer
+  dock:          { alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+                   paddingBottom: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider },
+  hint:          { ...type.body, fontFamily: fonts.bold, color: colors.text, textAlign: "center" },
+  micWrap:       { width: ARC, height: ARC, alignItems: "center", justifyContent: "center" },
+  pulse:         { position: "absolute", width: RING, height: RING, borderRadius: RING / 2, backgroundColor: colors.danger },
+  arc:           { position: "absolute", width: ARC, height: ARC },
+  ring:          { width: RING, height: RING, borderRadius: RING / 2, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  mic:           { width: MIC, height: MIC, borderRadius: MIC / 2, alignItems: "center", justifyContent: "center",
+                   borderTopWidth: 1, borderTopColor: colors.sheen },
+
+  typeBar:       { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm, alignSelf: "stretch" },
+  input:         { flex: 1, minHeight: 52, maxHeight: 120, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                   borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
                    ...type.body, color: colors.text },
-  editInput:     { flex: 0, marginTop: spacing.xs },
   sendButton:    { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   disabled:      { opacity: 0.45 },
-
-  block:         { gap: spacing.md },
-  blockTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
-  blockTitle:    { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
-  questionText:  { ...type.bodyLarge, color: colors.text },
-  editButton:    { alignSelf: "flex-end", marginTop: spacing.sm },
-  editActions:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.md },
-
-  bentoRow:      { flexDirection: "row", gap: spacing.md },
-  wideTile:      { flex: 0, minHeight: 0 },
-
-  answerCard:    { borderLeftWidth: 3, borderLeftColor: colors.primary },
-  answerText:    { ...type.body, color: colors.text, flex: 1 },
-  bulletRow:     { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
-  bulletDot:     { ...type.body, fontWeight: "700", color: colors.primary },
-  paragraphGap:  { height: spacing.sm },
 });

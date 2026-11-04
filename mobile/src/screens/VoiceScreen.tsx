@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  AccessibilityInfo,
   StyleSheet,
 } from "react-native";
 import { Audio } from "expo-av";
@@ -33,6 +34,7 @@ import LanguagePicker from "../components/LanguagePicker";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
+import FieldIllustration from "../components/FieldIllustration";
 import { appendHistory } from "../services/historyStorage";
 import type { AssistantReply } from "../types";
 import { colors, spacing, radius, cardShadow, type } from "../theme";
@@ -192,10 +194,18 @@ export default function VoiceScreen() {
   const phase = isRecording ? "listening" : isLoading ? "processing" : reply ? "answer" : "ready";
   const sendDisabled = isLoading || isRecording || !typedText.trim();
 
+  // Respect the phone's "reduce motion" setting
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    return () => subscription.remove();
+  }, []);
+
   // Gentle pulsing ring around the microphone while listening
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!isRecording) {
+    if (!isRecording || reduceMotion) {
       pulse.setValue(0);
       return;
     }
@@ -204,7 +214,7 @@ export default function VoiceScreen() {
     );
     loop.start();
     return () => loop.stop();
-  }, [isRecording, pulse]);
+  }, [isRecording, reduceMotion, pulse]);
 
   return (
     <ScrollView
@@ -221,9 +231,10 @@ export default function VoiceScreen() {
       </View>
 
       <View style={styles.micArea}>
+        <FieldIllustration style={styles.field} />
         <Badge label={t(PHASES[phase].key)} tone={PHASES[phase].tone} icon={PHASES[phase].icon} />
         <View style={styles.micWrap}>
-          {isRecording && (
+          {isRecording && !reduceMotion && (
             <Animated.View
               pointerEvents="none"
               style={[
@@ -430,6 +441,7 @@ const styles = StyleSheet.create({
   regionText:      { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
 
   micArea:         { alignItems: "center", marginTop: spacing.xl, marginBottom: spacing.md, gap: spacing.md },
+  field:           { position: "absolute", left: -spacing.lg, right: -spacing.lg, bottom: 36, height: 120 },
   micWrap:         { width: 208, height: 208, alignItems: "center", justifyContent: "center" },
   pulse:           { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: colors.danger },
   micButton:       { width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primary,

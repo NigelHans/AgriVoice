@@ -5,7 +5,7 @@
  * Appears without sliding when the phone asks for reduced motion.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReduceMotion } from "./motion";
 import { colors, radius, spacing } from "../theme";
@@ -60,22 +60,26 @@ export default function BottomSheet({ visible, onClose, closeLabel, children }: 
       <Animated.View style={[styles.backdrop, { opacity: translateY.interpolate({ inputRange: [0, offscreen], outputRange: [1, 0] }) }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={closeLabel} accessibilityRole="button" />
       </Animated.View>
-      <Animated.View
-        style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg), transform: [{ translateY }] }]}
-        accessibilityViewIsModal
-      >
-        <View style={styles.handleArea} {...pan.panHandlers}>
-          <View style={styles.handle} />
-        </View>
-        {children}
-      </Animated.View>
+      {/* box-none: taps outside the sheet still reach the backdrop */}
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === "ios" ? "padding" : undefined} pointerEvents="box-none">
+        <Animated.View
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg), transform: [{ translateY }] }]}
+          accessibilityViewIsModal
+        >
+          <View style={styles.handleArea} {...pan.panHandlers}>
+            <View style={styles.handle} />
+          </View>
+          {children}
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop:   { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
-  sheet:      { position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "88%", backgroundColor: colors.card,
+  keyboardArea: { flex: 1, justifyContent: "flex-end" },
+  sheet:      { maxHeight: "88%", backgroundColor: colors.card,
                 borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, borderColor: colors.glassBorder },
   handleArea: { alignItems: "center", paddingVertical: spacing.md },
   handle:     { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.surfaceRaised },

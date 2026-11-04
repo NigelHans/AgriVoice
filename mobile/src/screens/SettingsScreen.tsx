@@ -2,17 +2,19 @@
  * SettingsScreen — Language and region selection and app preferences.
  */
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, FlatList, TextInput, Modal, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, ScrollView, FlatList, TextInput, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
 import { useRegion, REGIONS, getRegionLabel } from "../context/RegionContext";
 import { useT } from "../i18n";
-import Card from "../components/Card";
-import Button from "../components/Button";
-import SectionHeader from "../components/SectionHeader";
+import Surface from "../components/Surface";
+import BottomSheet from "../components/BottomSheet";
+import FadeInView from "../components/FadeInView";
+import PressableScale from "../components/PressableScale";
 import StatusView from "../components/StatusView";
 import { colors, spacing, radius, type } from "../theme";
+
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 // Product names, not translated
 const TECH = "Groq + Llama 3.3 70B + Whisper";
@@ -35,70 +37,72 @@ export default function SettingsScreen() {
     setSearch("");
   };
 
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const languageLabel = LANGUAGES.find((l) => l.code === language)?.label ?? language;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <SectionHeader title={t("settings.languageTitle")} hint={t("settings.languageHint")} />
-      {/* Language names stay as written, so anyone can find their own language */}
-      <Card style={styles.groupCard}>
-        {LANGUAGES.map((lang, i) => {
-          const selected = language === lang.code;
-          return (
-            <TouchableOpacity
-              key={lang.code}
-              style={[styles.option, i > 0 && styles.optionDivider]}
-              onPress={() => setLanguage(lang.code)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-            >
-              <MaterialCommunityIcons
-                name={selected ? "radiobox-marked" : "radiobox-blank"}
-                size={24}
-                color={selected ? colors.primary : colors.textMuted}
-              />
-              <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{lang.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </Card>
-
-      <SectionHeader title={t("settings.regionTitle")} hint={t("settings.regionHint")} />
-      <Card style={styles.groupCard}>
-        <TouchableOpacity
-          style={styles.option}
+      <FadeInView style={styles.bentoRow}>
+        {/* Language names stay as written, so anyone can find their own language */}
+        <ControlTile
+          icon="translate"
+          label={t("settings.languageTitle")}
+          value={languageLabel}
+          action={t("settings.regionChange")}
+          onPress={() => setLanguageOpen(true)}
+        />
+        {/* Region labels are proper names, not translated */}
+        <ControlTile
+          icon="map-marker"
+          label={t("settings.regionTitle")}
+          value={getRegionLabel(region)}
+          action={t("settings.regionChange")}
           onPress={() => setPickerOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`${t("settings.regionTitle")}: ${getRegionLabel(region)}. ${t("settings.regionChange")}`}
-        >
-          <MaterialCommunityIcons name="map-marker" size={24} color={colors.primary} />
-          {/* Region labels are proper names, not translated */}
-          <Text style={[styles.optionText, styles.optionTextSelected]}>{getRegionLabel(region)}</Text>
-          <Text style={styles.changeText}>{t("settings.regionChange")}</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.primary} />
-        </TouchableOpacity>
-      </Card>
+        />
+      </FadeInView>
 
-      <SectionHeader title={t("settings.weatherTitle")} />
-      <Card style={styles.infoCard}>
-        <MaterialCommunityIcons name="crosshairs-gps" size={24} color={colors.secondary} />
-        <Text style={styles.infoText}>{t("settings.weatherHint")}</Text>
-      </Card>
+      <FadeInView index={1}>
+        <InfoTile icon="crosshairs-gps" title={t("settings.weatherTitle")} text={t("settings.weatherHint")} />
+      </FadeInView>
 
-      <SectionHeader title={t("settings.aboutTitle")} />
-      <Card style={styles.infoCard}>
-        <MaterialCommunityIcons name="sprout" size={24} color={colors.secondary} />
-        <View style={styles.aboutBody}>
-          <Text style={styles.aboutName}>AgriVoice v1.0.0</Text>
+      <FadeInView index={2}>
+        <Surface variant="glass" style={styles.about}>
+          <View style={styles.aboutHead}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="sprout" size={22} color={colors.primary} />
+            </View>
+            <View style={styles.aboutText}>
+              <Text style={styles.overline}>{t("settings.aboutTitle")}</Text>
+              <Text style={styles.aboutName}>AgriVoice v1.0.0</Text>
+            </View>
+          </View>
           <Text style={styles.infoText}>{t("settings.aboutDescription")}</Text>
           <Text style={styles.aboutTech}>{t("settings.poweredBy", { tech: TECH })}</Text>
-        </View>
-      </Card>
+        </Surface>
+      </FadeInView>
 
-      <Modal visible={pickerOpen} animationType="slide" onRequestClose={closePicker}>
-        <SafeAreaView style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle} accessibilityRole="header">{t("settings.regionSelectTitle")}</Text>
-            <Button label={t("history.close")} variant="text" icon="close" onPress={closePicker} />
-          </View>
+      <BottomSheet visible={languageOpen} onClose={() => setLanguageOpen(false)} closeLabel={t("history.close")}>
+        <View style={styles.sheetBody}>
+          <Text style={styles.sheetTitle} accessibilityRole="header">{t("settings.languageTitle")}</Text>
+          <Text style={styles.sheetHint}>{t("settings.languageHint")}</Text>
+          {LANGUAGES.map((lang) => {
+            const selected = language === lang.code;
+            return (
+              <OptionRow
+                key={lang.code}
+                label={lang.label}
+                selected={selected}
+                onPress={() => { setLanguage(lang.code); setLanguageOpen(false); }}
+              />
+            );
+          })}
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={pickerOpen} onClose={closePicker} closeLabel={t("history.close")}>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle} accessibilityRole="header">{t("settings.regionSelectTitle")}</Text>
+          <Text style={styles.sheetHint}>{t("settings.regionHint")}</Text>
           <View style={styles.searchBox}>
             <MaterialCommunityIcons name="magnify" size={22} color={colors.textMuted} />
             <TextInput
@@ -107,65 +111,128 @@ export default function SettingsScreen() {
               placeholderTextColor={colors.textMuted}
               value={search}
               onChangeText={setSearch}
-              autoFocus
               accessibilityLabel={t("settings.regionSearchPlaceholder")}
             />
           </View>
-          <FlatList
-            data={matches}
-            keyExtractor={(r) => r.value}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={matches.length === 0 ? styles.emptyList : styles.regionList}
-            renderItem={({ item }) => {
-              const selected = region === item.value;
-              return (
-                <TouchableOpacity
-                  style={[styles.regionRow, selected && styles.regionRowSelected]}
-                  onPress={() => { setRegion(item.value); closePicker(); }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                >
-                  <Text style={[styles.regionText, selected && styles.regionTextSelected]}>{item.label}</Text>
-                  {selected && <MaterialCommunityIcons name="check" size={24} color={colors.onPrimary} />}
-                </TouchableOpacity>
-              );
-            }}
-            ListEmptyComponent={<StatusView icon="search-outline" title={t("settings.regionNoMatch", { search: search.trim() })} />}
-          />
-        </SafeAreaView>
-      </Modal>
+        </View>
+        <FlatList
+          data={matches}
+          keyExtractor={(r) => r.value}
+          keyboardShouldPersistTaps="handled"
+          style={styles.regionList}
+          contentContainerStyle={matches.length === 0 ? styles.emptyList : styles.regionListContent}
+          renderItem={({ item }) => (
+            <OptionRow
+              label={item.label}
+              selected={region === item.value}
+              onPress={() => { setRegion(item.value); closePicker(); }}
+            />
+          )}
+          ListEmptyComponent={<StatusView icon="search-outline" title={t("settings.regionNoMatch", { search: search.trim() })} />}
+        />
+      </BottomSheet>
     </ScrollView>
+  );
+}
+
+// A bento control: what it is, its current value, and a tap to change it
+function ControlTile({ icon, label, value, action, onPress }: {
+  icon: IconName; label: string; value: string; action: string; onPress: () => void;
+}) {
+  return (
+    <PressableScale
+      style={styles.tileWrap}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}. ${action}`}
+    >
+      <Surface variant="raised" style={styles.tile}>
+        <View style={styles.iconCircle}>
+          <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
+        </View>
+        <Text style={styles.overline}>{label}</Text>
+        <Text style={styles.tileValue} numberOfLines={3}>{value}</Text>
+        <View style={styles.tileAction}>
+          <Text style={styles.tileActionText}>{action}</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+        </View>
+      </Surface>
+    </PressableScale>
+  );
+}
+
+function InfoTile({ icon, title, text }: { icon: IconName; title: string; text: string }) {
+  return (
+    <Surface style={styles.info}>
+      <View style={styles.iconCircle}>
+        <MaterialCommunityIcons name={icon} size={22} color={colors.secondary} />
+      </View>
+      <View style={styles.infoBody}>
+        <Text style={styles.overline}>{title}</Text>
+        <Text style={styles.infoText}>{text}</Text>
+      </View>
+    </Surface>
+  );
+}
+
+// One choice in a sheet: clay outline and a check when selected (never color alone)
+function OptionRow({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      style={[styles.option, selected && styles.optionSelected]}
+    >
+      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{label}</Text>
+      <MaterialCommunityIcons
+        name={selected ? "check-circle" : "circle-outline"}
+        size={24}
+        color={selected ? colors.primary : colors.textMuted}
+      />
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   container:          { flex: 1, backgroundColor: colors.background },
-  content:            { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
-  groupCard:          { paddingVertical: 0 },
-  option:             { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md },
-  optionDivider:      { borderTopWidth: 1, borderTopColor: colors.divider },
-  optionText:         { ...type.body, color: colors.text, flex: 1 },
-  optionTextSelected: { fontWeight: "700", color: colors.primary },
-  changeText:         { ...type.body, fontWeight: "700", color: colors.primary },
-  infoCard:           { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  infoText:           { ...type.body, color: colors.textSecondary, flex: 1 },
-  aboutBody:          { flex: 1, gap: spacing.xs },
+  content:            { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+
+  bentoRow:           { flexDirection: "row", gap: spacing.md },
+  tileWrap:           { flex: 1 },
+  tile:               { flex: 1, gap: spacing.sm, minHeight: 176 },
+  iconCircle:         { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
+                        backgroundColor: colors.background },
+  overline:           { ...type.overline, color: colors.textSecondary },
+  tileValue:          { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexGrow: 1 },
+  tileAction:         { flexDirection: "row", alignItems: "center", gap: 2 },
+  tileActionText:     { ...type.body, fontWeight: "700", color: colors.primary },
+
+  info:               { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  infoBody:           { flex: 1, gap: spacing.xs },
+  infoText:           { ...type.body, color: colors.textSecondary },
+
+  about:              { gap: spacing.sm },
+  aboutHead:          { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  aboutText:          { flex: 1 },
   aboutName:          { ...type.bodyLarge, fontWeight: "700", color: colors.text },
   aboutTech:          { ...type.caption, color: colors.accent },
 
-  modal:              { flex: 1, backgroundColor: colors.background },
-  modalHeader:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: spacing.lg,
-                        paddingRight: spacing.xs, paddingVertical: spacing.xs, backgroundColor: colors.card,
-                        borderBottomWidth: 1, borderBottomColor: colors.divider },
-  modalTitle:         { ...type.title, fontWeight: "700", color: colors.text, flex: 1 },
-  searchBox:          { flexDirection: "row", alignItems: "center", gap: spacing.sm, margin: spacing.lg, paddingHorizontal: spacing.md,
-                        minHeight: 52, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  sheetBody:          { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },
+  sheetHeader:        { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  sheetTitle:         { ...type.title, fontWeight: "700", color: colors.text },
+  sheetHint:          { ...type.caption, color: colors.textSecondary, marginBottom: spacing.xs },
+  searchBox:          { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, minHeight: 52,
+                        borderRadius: radius.lg, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,
+                        marginBottom: spacing.sm },
   searchInput:        { flex: 1, ...type.body, color: colors.text, paddingVertical: spacing.sm },
-  regionList:         { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  emptyList:          { flexGrow: 1 },
-  regionRow:          { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg,
-                        marginBottom: spacing.sm, borderRadius: radius.md, backgroundColor: colors.card },
-  regionRowSelected:  { backgroundColor: colors.primary },
-  regionText:         { ...type.body, color: colors.text, flex: 1 },
-  regionTextSelected: { fontWeight: "700", color: colors.onPrimary },
+  regionList:         { flexShrink: 1 },
+  regionListContent:  { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },
+  emptyList:          { flexGrow: 1, minHeight: 240 },
+
+  option:             { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg,
+                        borderRadius: radius.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.glassBorder },
+  optionSelected:     { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
+  optionText:         { ...type.body, color: colors.text, flex: 1 },
+  optionTextSelected: { fontWeight: "700" },
 });

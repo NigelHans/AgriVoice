@@ -1,15 +1,16 @@
 # Migration 001 — Rollout, Rollback and Recovery Plan
 
-Applies to `public.market_prices` as inspected on 2026-10-27: 34 rows, integer `id`
-(`market_prices_id_seq`, last_value 34), `fair_price_per_kg NOT NULL`,
-`UNIQUE (crop_name, region)`, RLS enabled.
+Applies to `public.market_prices` as snapshotted on 2026-11-04 (`../snapshot_queries.sql` R1–R17):
+51 rows, integer `id` (max 218; `market_prices_id_seq` last_value 426), `fair_price_per_kg NOT NULL`,
+`unique_crop_region` = `UNIQUE (crop_name, region)`, RLS enabled. All 51 `updated_at` values fall on
+2026-11-01 (Manila). Migration 001 checks these exact values and refuses to run if any differ.
 
 | File | Purpose | Modifies data? |
 |---|---|---|
 | `../inspect_market_prices.sql` | Read-only inspection, before and after | No |
 | `001_market_prices_standardize.sql` | The migration | Yes, adds columns/index, swaps the unique constraint |
 | `001_market_prices_standardize_rollback.sql` | Undo 001 (R1, optionally R2) | Yes |
-| `001_recovery_restore_legacy_rows.sql` | Restore the 34 legacy rows from backup (R3) | Yes |
+| `001_recovery_restore_legacy_rows.sql` | Restore the 51 legacy rows from backup (R3) | Yes |
 
 Every script runs in a single transaction and aborts on any failed check.
 None of them touch the id sequence, RLS policies or grants.
@@ -22,10 +23,12 @@ The new backend code expects the migrated columns, and the old table rejects the
 new sync. **Apply in this order:**
 
 1. Record the pre-migration values: run `inspect_market_prices.sql` queries #2, #4, #5, #8, #9.
-2. Make sure nothing else writes to `market_prices` during the migration.
-   The old backend's sync cannot write anyway: it references an undefined setting.
+2. **Stop every other writer.** The `fix/mobile-entry-point` backend (the 2026-11-01 writer) upserts
+   on `(crop_name, region)` at startup. That conflict target disappears with 001, so it must be
+   stopped now and replaced by the new backend in step 5. If it writes after the snapshot,
+   001 refuses to run (its `updated_at` check fails): re-run the snapshot and review again.
 3. Run `001_market_prices_standardize.sql` in the Supabase SQL Editor.
-   Expected NOTICEs: `Dropped legacy constraint …` and `Migration 001 checks passed: 34 rows …`.
+   Expected NOTICEs: `Dropped legacy constraint unique_crop_region …` and `Migration 001 checks passed: 51 rows …`.
 4. Re-run inspection #1–#5 and #11. Compare the checksums with step 1.
 5. Deploy the new backend. Its first startup sync upserts about 663 verified rows.
 6. Check: `SELECT is_legacy, count(*), min(price_date), max(price_date) FROM market_prices GROUP BY 1;`
@@ -39,7 +42,7 @@ and chat reports prices as `unavailable` until the migration is applied. Nothing
 |---|---|
 | `fair_price_per_kg NOT NULL` | Kept. The sync writes the same value to `price_per_kg` and `fair_price_per_kg`. |
 | `UNIQUE (crop_name, region)` | Replaced by `UNIQUE (crop_name, region, price_date)` so monthly history fits. The sync upserts on `crop_name,region,price_date`. |
-| `id` / sequence | The sync never sends `id`, so the existing `nextval` default assigns 35, 36, … Upsert conflicts consume sequence values, so gaps are expected and harmless. |
+| `id` / sequence | The sync never sends `id`, so the existing `nextval` default assigns 427, 428, … Upsert conflicts consume sequence values, so gaps are expected and harmless. |
 | `updated_at` | Legacy rows keep their original value. New rows record the sync time. |
 | Legacy rows | `is_legacy = true`, `source = 'legacy sync (report date unknown)'`. The backend ranks verified rows first, keeps legacy rows out of history, returns `price_status = "unverified_legacy"`, and hides their placeholder date. |
 | `schema.sql` (new projects) | Has the same columns, including `fair_price_per_kg`, `is_legacy` and `updated_at`. Do **not** run it on the existing project. |
@@ -53,7 +56,8 @@ Confirm with inspection #4. Fix the reported cause, then re-inspect before retry
 ### R1 — Applied, but no new rows yet (`SELECT count(*) FROM market_prices WHERE NOT is_legacy` = 0)
 1. Stop or hold the new backend (`PRICE_SYNC_ON_STARTUP=false`).
 2. Run `001_market_prices_standardize_rollback.sql`.
-3. Expect `Rollback checks passed: 34 rows, price checksum …`.
+3. Expect `Rollback checks passed: 51 rows, price checksum 5231.11`. The rollback also checks the rows hash
+   and puts back the original comment on `fair_price_per_kg`, both saved by 001.
 4. Re-run inspection #1, #2, #4 and compare with the values from before migrating.
 
 The result is the original columns and the original constraint name. Data is identical.
@@ -77,12 +81,14 @@ without that explicit edit.
 This is possible while the public `ALL` policy exists (see section 4).
 1. Run the **preview** query at the top of `001_recovery_restore_legacy_rows.sql`.
 2. Run the restore part. It restores changed rows and re-inserts deleted ones with their **original ids**.
-3. Expect `Recovery checks passed: 34 legacy rows …`. A second run is a no-op.
+3. Expect `Recovery checks passed: 51 legacy rows …`. A second run is a no-op.
 
 ### Backup lifecycle
-- `migration_backup.market_prices_001` holds the 34 original rows.
-- `migration_backup.migration_001_meta` holds the dropped constraint name and the checksums.
-- The schema is revoked from `anon`/`authenticated`, so it is not reachable through the API.
+- `migration_backup.market_prices_001` holds the 51 original rows.
+- `migration_backup.migration_001_meta` holds the dropped constraint name, the checksums, the rows hash
+  and the original `fair_price_per_kg` comment.
+- Schema usage and table privileges are revoked from `anon`/`authenticated` (the broad default
+  privileges from R16 would otherwise apply), so it is not reachable through the API.
 - Keep it until you're satisfied, then drop it manually with `DROP SCHEMA migration_backup CASCADE;`.
 - Migration 001 refuses to run again while these backup tables exist.
 
@@ -126,14 +132,15 @@ COMMIT;
 ## 5. Review checklist (before running 001 on Supabase)
 
 - [ ] Read `001_market_prices_standardize.sql` end to end.
-- [ ] Inspection #4 still shows **34 rows**. The migration aborts otherwise.
+- [ ] R5 re-run right before migrating still shows **51 rows, 5231.11, 3930, max id 218**, and R6 still shows only 2026-11-01. The migration aborts otherwise.
+- [ ] Optional: paste your saved R5 `rows_hash` into `expected_rows_hash` at the top of 001.
 - [ ] Recorded before values: row count, `fair_price_checksum`, `id_checksum`, `max_id`, sequence `last_value`.
-- [ ] Inspection #2 shows exactly one `UNIQUE (crop_name, region)` constraint. Note its name.
+- [ ] R3 shows exactly one `UNIQUE (crop_name, region)` constraint, named `unique_crop_region`.
 - [ ] Inspection #7 (duplicates) returns no rows.
 - [ ] Inspection #8 region spellings match WFP's `admin1` names, e.g. `National Capital region`, `Region IV-A`. If they differ, legacy and verified rows form separate series. That's harmless, but tell the developer.
 - [ ] Legacy `updated_at` converted to Manila time gives the expected placeholder date. Sync times after 16:00 UTC fall on the next Manila day.
-- [ ] No other writer (old backend, scripts) is active during the migration.
+- [ ] No other writer is active: the `fix/mobile-entry-point` deployment is stopped (see step 2).
 - [ ] A Supabase backup or point-in-time recovery is available, as a second safety net besides `migration_backup`.
 - [ ] You know which rollback path (R1/R2/R3) applies if something looks wrong afterwards.
-- [ ] After running: NOTICE `checks passed`, checksums unchanged, the sequence still `34 / true`, policies unchanged.
+- [ ] After running: NOTICE `checks passed`, checksums unchanged, the sequence unchanged (426 / true unless something inserted since), policies unchanged.
 - [ ] RLS hardening (section 4) is scheduled **separately**, after confirming the backend's key type.

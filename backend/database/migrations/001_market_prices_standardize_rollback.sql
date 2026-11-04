@@ -13,6 +13,7 @@
 -- Before running: stop the new backend's price sync (PRICE_SYNC_ON_STARTUP=false
 -- or stop the service) so it cannot write during or after the rollback.
 --
+-- Restores the original comment on fair_price_per_kg (saved by 001; NULL if there was none).
 -- Does not touch the id sequence (gaps after deleted rows are harmless),
 -- RLS policies or grants. The backup schema is kept; drop it manually later.
 
@@ -105,7 +106,12 @@ ALTER TABLE public.market_prices
     DROP COLUMN created_at,
     DROP COLUMN is_legacy;
 
-COMMENT ON COLUMN public.market_prices.fair_price_per_kg IS NULL;
+-- Put back the comment 001 replaced (format %L turns a NULL into "IS NULL", which removes it)
+DO $$
+BEGIN
+    EXECUTE format('COMMENT ON COLUMN public.market_prices.fair_price_per_kg IS %L',
+                   (SELECT pre_fair_price_comment FROM migration_backup.migration_001_meta));
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 5. Post-checks against the checksums recorded by migration 001
@@ -122,6 +128,18 @@ BEGIN
     IF post.row_count <> meta.pre_row_count OR post.price_sum <> meta.pre_price_sum OR post.id_sum <> meta.pre_id_sum THEN
         RAISE EXCEPTION 'Rollback checksum mismatch. expected=(%, %, %) actual=%',
             meta.pre_row_count, meta.pre_price_sum, meta.pre_id_sum, row_to_json(post);
+    END IF;
+
+    IF (SELECT md5(string_agg((id, crop_name, region, province, fair_price_per_kg, updated_at)::text, E'\n' ORDER BY id))
+        FROM public.market_prices) <> meta.pre_rows_hash THEN
+        RAISE EXCEPTION 'Rollback rows_hash mismatch: the original columns differ from before migration 001.';
+    END IF;
+
+    IF col_description('public.market_prices'::regclass,
+                       (SELECT attnum FROM pg_attribute
+                        WHERE attrelid = 'public.market_prices'::regclass AND attname = 'fair_price_per_kg'))
+       IS DISTINCT FROM meta.pre_fair_price_comment THEN
+        RAISE EXCEPTION 'The comment on fair_price_per_kg was not restored.';
     END IF;
 
     RAISE NOTICE 'Rollback checks passed: % rows, price checksum %.', post.row_count, post.price_sum;

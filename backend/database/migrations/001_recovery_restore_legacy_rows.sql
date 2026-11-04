@@ -1,5 +1,5 @@
 -- AgriVoice — Recovery R3 for migration 001 (PROPOSED — for human review)
--- Use when migration 001 is applied and some of the 34 pre-existing (legacy)
+-- Use when migration 001 is applied and some of the 51 pre-existing (legacy)
 -- rows were changed or deleted afterwards (e.g. through the public ALL policy).
 --
 -- Restores every legacy row from migration_backup.market_prices_001 using its
@@ -77,6 +77,12 @@ BEGIN
        OR restored.id_sum <> meta.pre_id_sum THEN
         RAISE EXCEPTION 'Recovery verification failed: expected (%, %, %) got %',
             meta.pre_row_count, meta.pre_price_sum, meta.pre_id_sum, row_to_json(restored);
+    END IF;
+
+    -- Same fingerprint as before migration 001, over the legacy rows' original columns
+    IF (SELECT md5(string_agg((id, crop_name, region, province, fair_price_per_kg, updated_at)::text, E'\n' ORDER BY id))
+        FROM public.market_prices WHERE is_legacy) <> meta.pre_rows_hash THEN
+        RAISE EXCEPTION 'Recovery rows_hash mismatch: legacy rows still differ from the backup.';
     END IF;
     RAISE NOTICE 'Recovery checks passed: % legacy rows restored/verified, price checksum %.',
         restored.row_count, restored.price_sum;

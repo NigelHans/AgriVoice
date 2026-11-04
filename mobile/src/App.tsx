@@ -4,9 +4,9 @@
  */
 
 import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "./context/LanguageContext";
@@ -19,16 +19,29 @@ import MarketScreen from "./screens/MarketScreen";
 import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
-import { colors } from "./theme";
+import { colors, type } from "./theme";
 
 const Tab = createBottomTabNavigator();
 
-const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
-  Voice: "mic",
-  Market: "bar-chart",
-  Weather: "partly-sunny",
-  History: "chatbubbles",
-  Settings: "settings",
+const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Voice: "microphone",
+  Market: "storefront-outline",
+  Weather: "weather-partly-cloudy",
+  History: "history",
+  Settings: "cog-outline",
+};
+
+// Screen backgrounds and borders behind every tab follow the AgriVoice palette
+const NAV_THEME = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.primary,
+    background: colors.background,
+    card: colors.card,
+    text: colors.text,
+    border: colors.divider,
+  },
 };
 
 export default function App() {
@@ -36,7 +49,7 @@ export default function App() {
     <SafeAreaProvider>
       <LanguageProvider>
       <RegionProvider>
-      <NavigationContainer>
+      <NavigationContainer theme={NAV_THEME}>
         <StatusBar style="light" />
         <AppTabs />
       </NavigationContainer>
@@ -55,13 +68,15 @@ function AppTabs() {
           screenOptions={({ route }) => ({
             headerStyle: { backgroundColor: colors.primary },
             headerTintColor: colors.onPrimary,
-            headerTitleStyle: { fontWeight: "bold" },
+            headerTitleStyle: { ...type.title, fontWeight: "700" },
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.textMuted,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons
+            tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.divider },
+            tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+            tabBarIcon: ({ color, focused }) => (
+              <MaterialCommunityIcons
                 name={ICON_MAP[route.name]}
-                size={size}
+                size={focused ? 28 : 26}
                 color={color}
               />
             ),

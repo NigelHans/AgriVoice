@@ -4,14 +4,20 @@
  * When GPS is unavailable, it falls back to the centre of the region chosen in Settings.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from "react-native";
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { fetchWeather } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type StringKey, type Translate, type UiMessage } from "../i18n";
 import type { DailyForecast } from "../types";
 import StatusView from "../components/StatusView";
-import { colors } from "../theme";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import SectionHeader from "../components/SectionHeader";
+import { colors, spacing, radius, type } from "../theme";
+
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 const GPS_TIMEOUT_MS = 15_000;
 const GEOCODE_TIMEOUT_MS = 5_000;
@@ -19,35 +25,35 @@ const GEOCODE_TIMEOUT_MS = 5_000;
 const LAST_KNOWN_MAX_AGE_MS = 60 * 60 * 1000;
 
 // Open-Meteo WMO weather codes (the backend passes them through unchanged)
-const WEATHER_CODES: Record<number, { icon: string; label: StringKey }> = {
-  0:  { icon: "☀️", label: "weather.code.0" },
-  1:  { icon: "🌤️", label: "weather.code.1" },
-  2:  { icon: "⛅", label: "weather.code.2" },
-  3:  { icon: "☁️", label: "weather.code.3" },
-  45: { icon: "🌫️", label: "weather.code.45" },
-  48: { icon: "🌫️", label: "weather.code.48" },
-  51: { icon: "🌦️", label: "weather.code.51" },
-  53: { icon: "🌦️", label: "weather.code.53" },
-  55: { icon: "🌧️", label: "weather.code.55" },
-  56: { icon: "🌧️", label: "weather.code.56" },
-  57: { icon: "🌧️", label: "weather.code.57" },
-  61: { icon: "🌦️", label: "weather.code.61" },
-  63: { icon: "🌧️", label: "weather.code.63" },
-  65: { icon: "🌧️", label: "weather.code.65" },
-  66: { icon: "🌧️", label: "weather.code.66" },
-  67: { icon: "🌧️", label: "weather.code.67" },
-  71: { icon: "🌨️", label: "weather.code.71" },
-  73: { icon: "🌨️", label: "weather.code.73" },
-  75: { icon: "❄️", label: "weather.code.75" },
-  77: { icon: "🌨️", label: "weather.code.77" },
-  80: { icon: "🌦️", label: "weather.code.80" },
-  81: { icon: "🌧️", label: "weather.code.81" },
-  82: { icon: "⛈️", label: "weather.code.82" },
-  85: { icon: "🌨️", label: "weather.code.85" },
-  86: { icon: "❄️", label: "weather.code.86" },
-  95: { icon: "⛈️", label: "weather.code.95" },
-  96: { icon: "⛈️", label: "weather.code.96" },
-  99: { icon: "⛈️", label: "weather.code.99" },
+const WEATHER_CODES: Record<number, { icon: IconName; label: StringKey }> = {
+  0:  { icon: "weather-sunny", label: "weather.code.0" },
+  1:  { icon: "weather-partly-cloudy", label: "weather.code.1" },
+  2:  { icon: "weather-partly-cloudy", label: "weather.code.2" },
+  3:  { icon: "weather-cloudy", label: "weather.code.3" },
+  45: { icon: "weather-fog", label: "weather.code.45" },
+  48: { icon: "weather-fog", label: "weather.code.48" },
+  51: { icon: "weather-partly-rainy", label: "weather.code.51" },
+  53: { icon: "weather-partly-rainy", label: "weather.code.53" },
+  55: { icon: "weather-rainy", label: "weather.code.55" },
+  56: { icon: "weather-snowy-rainy", label: "weather.code.56" },
+  57: { icon: "weather-snowy-rainy", label: "weather.code.57" },
+  61: { icon: "weather-partly-rainy", label: "weather.code.61" },
+  63: { icon: "weather-rainy", label: "weather.code.63" },
+  65: { icon: "weather-pouring", label: "weather.code.65" },
+  66: { icon: "weather-snowy-rainy", label: "weather.code.66" },
+  67: { icon: "weather-snowy-rainy", label: "weather.code.67" },
+  71: { icon: "weather-snowy", label: "weather.code.71" },
+  73: { icon: "weather-snowy", label: "weather.code.73" },
+  75: { icon: "weather-snowy-heavy", label: "weather.code.75" },
+  77: { icon: "weather-snowy", label: "weather.code.77" },
+  80: { icon: "weather-partly-rainy", label: "weather.code.80" },
+  81: { icon: "weather-rainy", label: "weather.code.81" },
+  82: { icon: "weather-pouring", label: "weather.code.82" },
+  85: { icon: "weather-snowy", label: "weather.code.85" },
+  86: { icon: "weather-snowy-heavy", label: "weather.code.86" },
+  95: { icon: "weather-lightning", label: "weather.code.95" },
+  96: { icon: "weather-hail", label: "weather.code.96" },
+  99: { icon: "weather-hail", label: "weather.code.99" },
 };
 const SEVERE_CODES = new Set([65, 67, 75, 82, 86, 95, 96, 99]);
 const HIGH_RAIN_CHANCE = 70;
@@ -206,75 +212,139 @@ export default function WeatherScreen() {
     );
   }
 
+  // Days with heavy rain, a storm or a high rain chance — taken only from the forecast data
+  const isSevere = (day: DailyForecast) =>
+    (day.weather_code !== null && SEVERE_CODES.has(day.weather_code))
+    || (day.rain_probability !== null && day.rain_probability >= HIGH_RAIN_CHANCE);
+  const [today, ...nextDays] = forecast;
+  const severeDays = forecast.filter(isSevere).map((day) => dayLabel(day.date, t).title);
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={[colors.primary]} tintColor={colors.primary} />
+      }
     >
-      {source?.kind === "region" ? (
-        <>
-          <Text style={styles.location}>📍 {getRegionLabel(source.region)}</Text>
-          <View style={styles.notice}>
+      <View style={styles.locationRow}>
+        <MaterialCommunityIcons name="map-marker" size={20} color={colors.accent} />
+        <Text style={styles.location}>
+          {source?.kind === "region" ? getRegionLabel(source.region) : source?.place || t("weather.yourLocation")}
+        </Text>
+      </View>
+
+      {source?.kind === "region" && (
+        <View style={styles.notice}>
+          <View style={styles.noticeRow}>
+            <MaterialCommunityIcons name="crosshairs-off" size={20} color={colors.notice} />
             <Text style={styles.noticeText}>
               {t(source.reason)}{"\n"}
               {t("weather.fallbackNotice", { city: REGION_CENTERS[source.region]?.city ?? "—" })}
             </Text>
-            <TouchableOpacity style={styles.noticeBtn} onPress={() => load(true)} disabled={refreshing}>
-              <Text style={styles.noticeBtnText}>{t("weather.useGps")}</Text>
-            </TouchableOpacity>
           </View>
-        </>
-      ) : (
-        <Text style={styles.location}>📍 {source?.place || t("weather.yourLocation")}</Text>
+          <Button
+            label={t("weather.useGps")}
+            variant="secondary"
+            icon="crosshairs-gps"
+            onPress={() => load(true)}
+            disabled={refreshing}
+            style={styles.noticeButton}
+          />
+        </View>
       )}
 
       {refreshError && (
         <View style={styles.banner}>
+          <MaterialCommunityIcons name="wifi-off" size={20} color={colors.danger} />
           <Text style={styles.bannerText}>
             {t("weather.refreshFailed")} {t(refreshError.key, refreshError.values)}
           </Text>
         </View>
       )}
 
-      {forecast.length === 0 && <Text style={styles.empty}>{t("weather.empty")}</Text>}
-      {forecast.map((day) => {
-        const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
-        const severe = (day.weather_code !== null && SEVERE_CODES.has(day.weather_code))
-          || (day.rain_probability !== null && day.rain_probability >= HIGH_RAIN_CHANCE);
-        const { title, subtitle } = dayLabel(day.date, t);
-        return (
-          <View key={day.date} style={[styles.card, severe && styles.cardSevere]}>
-            <View style={styles.cardTop}>
-              <Text style={styles.icon}>{weather?.icon ?? "🌡️"}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.date}>
-                  {title}
-                  {subtitle !== "" && <Text style={styles.dateSub}>  {subtitle}</Text>}
-                </Text>
-                <Text style={[styles.description, severe && styles.descriptionSevere]}>{weather ? t(weather.label) : "—"}</Text>
-              </View>
-            </View>
-            <View style={styles.stats}>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>{t("weather.tempLabel")}</Text>
-                <Text style={styles.temp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>{t("weather.rainLabel")}</Text>
-                <Text style={[styles.rain, severe && styles.descriptionSevere]}>🌧️ {formatValue(day.rain_probability, "%")}</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>{t("weather.windLabel")}</Text>
-                <Text style={styles.wind}>💨 {formatValue(day.wind_speed, " km/h")}</Text>
-              </View>
-            </View>
+      {severeDays.length > 0 && (
+        <View style={styles.warning} accessibilityRole="alert">
+          <MaterialCommunityIcons name="alert" size={26} color={colors.warningText} />
+          <View style={styles.warningBody}>
+            <Text style={styles.warningTitle}>{t("weather.warningTitle")}</Text>
+            <Text style={styles.warningText}>{t("weather.warningDays", { days: severeDays.join(", ") })}</Text>
           </View>
-        );
-      })}
+        </View>
+      )}
+
+      {forecast.length === 0 && <StatusView icon="cloud-outline" title={t("weather.empty")} />}
+
+      {today && <TodayCard day={today} severe={isSevere(today)} t={t} />}
+      {nextDays.length > 0 && <SectionHeader title={t("weather.nextDays")} />}
+      {nextDays.map((day) => <DayCard key={day.date} day={day} severe={isSevere(day)} t={t} />)}
     </ScrollView>
   );
 }
+
+// The first forecast day, large: icon, temperature, description, rain chance and wind
+function TodayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
+  const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
+  const { title, subtitle } = dayLabel(day.date, t);
+  return (
+    <Card style={[styles.todayCard, severe && styles.severeEdge]}>
+      <Text style={styles.todayTitle}>
+        {title}
+        {subtitle !== "" && <Text style={styles.todaySub}>  {subtitle}</Text>}
+      </Text>
+      <View style={styles.todayMain}>
+        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={72} color={severe ? colors.warningText : colors.primary} />
+        <View style={styles.todayInfo}>
+          <Text style={styles.statLabel}>{t("weather.tempLabel")}</Text>
+          <Text style={styles.todayTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
+          <Text style={[styles.todayDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
+        </View>
+      </View>
+      <View style={styles.stats}>
+        <Stat icon="water-percent" label={t("weather.rainLabel")} value={formatValue(day.rain_probability, "%")} highlight={severe} />
+        <Stat icon="weather-windy" label={t("weather.windLabel")} value={formatValue(day.wind_speed, " km/h")} />
+      </View>
+    </Card>
+  );
+}
+
+// One of the following days, compact, with the same values in the same order
+function DayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
+  const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
+  const { title, subtitle } = dayLabel(day.date, t);
+  return (
+    <Card style={[styles.dayCard, severe && styles.severeEdge]}>
+      <View style={styles.dayTop}>
+        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={36} color={severe ? colors.warningText : colors.primary} />
+        <View style={styles.dayInfo}>
+          <Text style={styles.dayTitle}>
+            {title}
+            {subtitle !== "" && <Text style={styles.daySub}>  {subtitle}</Text>}
+          </Text>
+          <Text style={[styles.dayDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
+        </View>
+        <Text style={styles.dayTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
+      </View>
+      <View style={styles.stats}>
+        <Stat icon="water-percent" label={t("weather.rainLabel")} value={formatValue(day.rain_probability, "%")} highlight={severe} />
+        <Stat icon="weather-windy" label={t("weather.windLabel")} value={formatValue(day.wind_speed, " km/h")} />
+      </View>
+    </Card>
+  );
+}
+
+function Stat({ icon, label, value, highlight = false }: { icon: IconName; label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={styles.stat}>
+      <MaterialCommunityIcons name={icon} size={22} color={highlight ? colors.warningText : colors.secondary} />
+      <View>
+        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={[styles.statValue, highlight && styles.severeText]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 
 // Coordinates from GPS, or a GpsError whose reasonKey tells the farmer why not
 async function getGpsCoords(): Promise<Coords> {
@@ -361,28 +431,48 @@ function formatValue(value: number | null, unit: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content:   { padding: 12 },
-  location:  { fontSize: 16, fontWeight: "bold", color: colors.primary, marginBottom: 12 },
-  notice:    { backgroundColor: colors.noticeBg, borderRadius: 10, padding: 12, marginBottom: 12 },
-  noticeText:{ fontSize: 13, color: colors.notice, lineHeight: 19 },
-  noticeBtn: { alignSelf: "flex-start", marginTop: 8, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
-  noticeBtnText: { color: colors.onPrimary, fontWeight: "bold", fontSize: 13 },
-  banner:    { backgroundColor: colors.dangerBg, borderRadius: 8, padding: 10, marginBottom: 12 },
-  bannerText:{ fontSize: 12, color: colors.danger },
-  card:      { backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardSevere:{ borderLeftWidth: 4, borderLeftColor: colors.warning },
-  cardTop:   { flexDirection: "row", alignItems: "center" },
-  icon:      { fontSize: 32, marginRight: 12 },
-  date:      { fontWeight: "bold", color: colors.text },
-  dateSub:   { fontWeight: "normal", color: colors.textMuted, fontSize: 12 },
-  description: { color: colors.textSecondary, marginTop: 2 },
-  descriptionSevere: { color: colors.warningText, fontWeight: "bold" },
-  stats:     { flexDirection: "row", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.divider },
-  stat:      { flex: 1 },
-  statLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
-  temp:      { color: colors.text, fontWeight: "bold" },
-  rain:      { color: colors.primary, fontWeight: "bold" },
-  wind:      { color: colors.textSecondary, fontWeight: "bold" },
-  empty:     { textAlign: "center", marginTop: 40, color: colors.textFaint },
+  container:    { flex: 1, backgroundColor: colors.background },
+  content:      { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xl },
+  locationRow:  { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.md },
+  location:     { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexShrink: 1 },
+
+  notice:       { backgroundColor: colors.noticeBg, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+  noticeRow:    { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  noticeText:   { ...type.caption, color: colors.notice, flex: 1 },
+  noticeButton: { alignSelf: "flex-start", marginTop: spacing.md },
+
+  banner:       { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.dangerBg,
+                  borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+  bannerText:   { ...type.caption, color: colors.danger, flex: 1 },
+
+  warning:      { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, backgroundColor: colors.warningBg,
+                  borderRadius: radius.md, borderLeftWidth: 4, borderLeftColor: colors.warning, padding: spacing.md, marginBottom: spacing.md },
+  warningBody:  { flex: 1 },
+  warningTitle: { ...type.body, fontWeight: "700", color: colors.warningText },
+  warningText:  { ...type.caption, color: colors.warningText },
+
+  todayCard:    { marginBottom: spacing.sm },
+  todayTitle:   { ...type.title, fontWeight: "700", color: colors.text },
+  todaySub:     { ...type.caption, fontWeight: "400", color: colors.textSecondary },
+  todayMain:    { flexDirection: "row", alignItems: "center", gap: spacing.lg, marginTop: spacing.md },
+  todayInfo:    { flex: 1 },
+  todayTemp:    { ...type.display, fontWeight: "700", color: colors.text },
+  todayDesc:    { ...type.bodyLarge, color: colors.textSecondary },
+
+  dayCard:      { marginBottom: spacing.md },
+  dayTop:       { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  dayInfo:      { flex: 1 },
+  dayTitle:     { ...type.body, fontWeight: "700", color: colors.text },
+  daySub:       { ...type.caption, fontWeight: "400", color: colors.textSecondary },
+  dayDesc:      { ...type.caption, color: colors.textSecondary },
+  dayTemp:      { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+
+  severeEdge:   { borderLeftWidth: 4, borderLeftColor: colors.warning },
+  severeText:   { color: colors.warningText, fontWeight: "700" },
+
+  stats:        { flexDirection: "row", gap: spacing.lg, marginTop: spacing.md, paddingTop: spacing.md,
+                  borderTopWidth: 1, borderTopColor: colors.divider },
+  stat:         { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  statLabel:    { ...type.caption, color: colors.textMuted },
+  statValue:    { ...type.body, fontWeight: "700", color: colors.text },
 });

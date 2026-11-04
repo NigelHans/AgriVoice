@@ -9,7 +9,7 @@ import React from "react";
 import { Text, ActivityIndicator, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PressableScale from "./PressableScale";
-import { colors, radius, spacing, touch, type, fonts } from "../theme";
+import { colors, radius, spacing, touch, type, fonts, themed } from "../theme";
 
 type Variant = "primary" | "secondary" | "text" | "danger";
 
@@ -24,18 +24,19 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-const FOREGROUND: Record<Variant, string> = {
+// A function, so the colors follow the current theme
+const foreground = (): Record<Variant, string> => ({
   primary: colors.onPrimary,
   secondary: colors.primary,
   text: colors.primary,
   danger: colors.danger,
-};
+});
 
 export default function Button({
   label, onPress, variant = "primary", icon, disabled, loading, accessibilityLabel, style,
 }: Props) {
   const inactive = disabled || loading;
-  const color = FOREGROUND[variant];
+  const color = foreground()[variant];
   return (
     <PressableScale
       onPress={onPress}
@@ -55,7 +56,7 @@ export default function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   base:      { minHeight: touch.min, flexDirection: "row", alignItems: "center", justifyContent: "center",
                paddingHorizontal: spacing.xl, borderRadius: radius.pill },
   primary:   { backgroundColor: colors.primary },
@@ -65,4 +66,4 @@ const styles = StyleSheet.create({
   inactive:  { opacity: 0.45 },
   icon:      { marginRight: spacing.sm },
   label:     { ...type.body, fontFamily: fonts.bold },
-});
+}));

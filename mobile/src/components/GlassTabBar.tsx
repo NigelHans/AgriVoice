@@ -9,7 +9,7 @@ import { Animated, Keyboard, Platform, Text, View, StyleSheet, type LayoutChange
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import PressableScale from "./PressableScale";
 import { useReduceMotion } from "./motion";
-import { colors, radius, spacing, type, fonts } from "../theme";
+import { colors, radius, spacing, type, fonts, themed } from "../theme";
 
 export default function GlassTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const reduceMotion = useReduceMotion();
@@ -87,7 +87,7 @@ export default function GlassTabBar({ state, descriptors, navigation, insets }: 
 
 const BAR_PADDING = spacing.xs;
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   outer:     { backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   bar:       { flexDirection: "row", padding: BAR_PADDING, borderRadius: radius.xl, backgroundColor: colors.glass,
                borderWidth: 1, borderColor: colors.glassBorder },
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
                backgroundColor: colors.surfaceRaised, borderTopWidth: 1, borderTopColor: colors.highlight },
   item:      { flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", gap: 2 },
   label:     { ...type.caption, fontSize: 12, lineHeight: 16, fontFamily: fonts.bold },
-});
+}));

@@ -18,7 +18,7 @@ import SectionHeader from "../components/SectionHeader";
 import FadeInView from "../components/FadeInView";
 import GradientFill from "../components/GradientFill";
 import PressableScale from "../components/PressableScale";
-import { colors, spacing, radius, type, fonts } from "../theme";
+import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -492,7 +492,7 @@ function formatValue(value: number | null, unit: string): string {
   return value === null ? "—" : `${Math.round(value)}${unit}`;
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container:     { flex: 1, backgroundColor: colors.background },
   content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   locationRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs },
@@ -554,4 +554,4 @@ const styles = StyleSheet.create({
   stat:          { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   statLabel:     { ...type.caption, color: colors.textSecondary },
   statValue:     { ...type.body, fontFamily: fonts.bold, color: colors.text },
-});
+}));

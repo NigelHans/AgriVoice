@@ -3,8 +3,8 @@
  * Bottom Tab Navigator + Region Selector State
  */
 
-import React from "react";
-import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
+import React, { useRef } from "react";
+import { NavigationContainer, DefaultTheme, DarkTheme, type NavigationState } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -12,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import { LanguageProvider } from "./context/LanguageContext";
 import { RegionProvider } from "./context/RegionContext";
+import { ThemeProvider, useThemeMode } from "./context/ThemeContext";
 import { useT } from "./i18n";
 import GlassTabBar from "./components/GlassTabBar";
 
@@ -22,7 +23,8 @@ import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import { withFocusFade } from "./components/FocusFade";
-import { colors, type, fonts } from "./theme";
+import PressableScale from "./components/PressableScale";
+import { colors, fonts, spacing, touch } from "./theme";
 
 const Tab = createBottomTabNavigator();
 
@@ -41,19 +43,6 @@ const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Settings: "cog-outline",
 };
 
-// Light navigation theme: screen backgrounds and borders behind every tab follow the Day palette
-const NAV_THEME = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: colors.primary,
-    background: colors.background,
-    card: colors.card,
-    text: colors.text,
-    border: colors.divider,
-  },
-};
-
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     [fonts.regular]: require("../assets/fonts/AtkinsonHyperlegible-Regular.ttf"),
@@ -67,15 +56,48 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+      <ThemeProvider>
       <LanguageProvider>
       <RegionProvider>
-      <NavigationContainer theme={NAV_THEME}>
-        <StatusBar style="dark" />
-        <AppTabs />
-      </NavigationContainer>
+        <ThemedNavigation />
       </RegionProvider>
       </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+// Screens remount when the theme switches (their styles are rebuilt for it); the saved state keeps the open tab.
+function ThemedNavigation() {
+  const { mode } = useThemeMode();
+  const navState = useRef<NavigationState | undefined>(undefined);
+  const base = mode === "night" ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, primary: colors.primary, background: colors.background, card: colors.card, text: colors.text, border: colors.divider },
+  };
+  return (
+    <NavigationContainer key={mode} theme={navTheme} initialState={navState.current} onStateChange={(state) => { navState.current = state; }}>
+      <StatusBar style={mode === "night" ? "light" : "dark"} />
+      <AppTabs />
+    </NavigationContainer>
+  );
+}
+
+// Header button on every tab: switches between Day (sun-readable) and Night
+function ThemeToggle() {
+  const { mode, setMode } = useThemeMode();
+  const t = useT();
+  const night = mode === "night";
+  return (
+    <PressableScale
+      onPress={() => setMode(night ? "day" : "night")}
+      accessibilityRole="button"
+      accessibilityLabel={night ? t("theme.toDay") : t("theme.toNight")}
+      style={{ width: touch.min, height: touch.min, alignItems: "center", justifyContent: "center", marginRight: spacing.xs }}
+    >
+      <MaterialCommunityIcons name={night ? "white-balance-sunny" : "weather-night"} size={24} color={colors.text} />
+    </PressableScale>
   );
 }
 
@@ -90,6 +112,7 @@ function AppTabs() {
             headerStyle: { backgroundColor: colors.background },
             headerShadowVisible: false,
             headerTintColor: colors.text,
+            headerRight: () => <ThemeToggle />,
             headerTitleStyle: { fontFamily: fonts.display, fontSize: 26 },
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.textSecondary,

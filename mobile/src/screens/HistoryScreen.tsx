@@ -17,7 +17,7 @@ import Badge from "../components/Badge";
 import BottomSheet from "../components/BottomSheet";
 import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
-import { colors, spacing, radius, type, fonts } from "../theme";
+import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
 
@@ -275,7 +275,7 @@ function languageLabel(code: string): string {
   return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container:       { flex: 1, backgroundColor: colors.background },
   toolbar:         { alignItems: "flex-end", paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   emptyList:       { flexGrow: 1 },
@@ -311,4 +311,4 @@ const styles = StyleSheet.create({
   detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   detailTitle:     { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flex: 1 },
   detailText:      { ...type.body, color: colors.text },
-});
+}));

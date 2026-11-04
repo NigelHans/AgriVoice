@@ -5,7 +5,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
 import Chip from "./Chip";
-import { spacing } from "../theme";
+import { spacing, themed } from "../theme";
 
 export default function LanguagePicker() {
   const { language, setLanguage } = useLanguage();
@@ -23,6 +23,6 @@ export default function LanguagePicker() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
-});
+}));

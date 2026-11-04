@@ -6,7 +6,7 @@ import React from "react";
 import { Text, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PressableScale from "./PressableScale";
-import { colors, radius, spacing, touch, type, fonts } from "../theme";
+import { colors, radius, spacing, touch, type, fonts, themed } from "../theme";
 
 type Props = {
   label: string;
@@ -33,10 +33,10 @@ export default function Chip({ label, selected = false, onPress, icon, accessibi
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   chip:     { minHeight: touch.min, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg,
               borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.card },
   selected: { backgroundColor: colors.primary, borderColor: colors.primary },
   icon:     { marginRight: spacing.xs },
   label:    { ...type.body, fontFamily: fonts.bold },
-});
+}));

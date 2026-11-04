@@ -12,7 +12,7 @@ import BottomSheet from "../components/BottomSheet";
 import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
 import StatusView from "../components/StatusView";
-import { colors, spacing, radius, type, fonts } from "../theme";
+import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -194,7 +194,7 @@ function OptionRow({ label, selected, onPress }: { label: string; selected: bool
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container:          { flex: 1, backgroundColor: colors.background },
   content:            { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
 
@@ -235,4 +235,4 @@ const styles = StyleSheet.create({
   optionSelected:     { borderColor: colors.primary, backgroundColor: colors.surfaceRaised },
   optionText:         { ...type.body, color: colors.text, flex: 1 },
   optionTextSelected: { fontFamily: fonts.bold },
-});
+}));

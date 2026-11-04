@@ -5,9 +5,9 @@
  * Contrast (WCAG, measured): every text color passes 4.5:1 on background, card, surfaceRaised,
  * sand and the three status backgrounds. Earth Brown is for edges and rules only.
  * Words on filled leaf / ember / amber controls use `onPrimary` (white).
- * The V2 night values are in git (commit 4d8bb86) for a later Night theme.
+ * Night mode swaps every token for `nightColors` (see applyThemeMode).
  */
-export const colors = {
+const dayColors = {
   // Accents
   primary: "#2F6B3A",        // Leaf: main actions, active states, icons
   secondary: "#386449",      // darker sage: secondary icons, processing state
@@ -51,6 +51,71 @@ export const colors = {
 
   shadow: "#17271D",
 };
+
+/** Night: the V2 forest palette. Same contrast rule; words on clay use dark `onPrimary`. */
+const nightColors: Palette = {
+  primary: "#C2A47C",        // Warm Clay
+  secondary: "#8DB58A",      // Sage
+  accent: "#C2A47C",
+  price: "#C2A47C",
+  earth: "#806044",
+  decor: "#806044",
+  sand: "#263C30",
+  onPrimary: "#111B17",
+
+  background: "#142219",     // Forest
+  card: "#1D3027",           // Deep Olive
+  surfaceRaised: "#263C30",  // lighter than V2's Moss, so clay and ember text pass 4.5:1 on it
+  glass: "rgba(29, 48, 39, 0.94)",
+  glassBorder: "rgba(216, 208, 189, 0.12)",
+  highlight: "rgba(216, 208, 189, 0.08)",
+  sheen: "rgba(255, 255, 255, 0.25)",
+  scrim: "rgba(0, 0, 0, 0.55)",
+
+  text: "#D8D0BD",           // Natural Linen
+  textSecondary: "#A7B0A1",
+  textMuted: "#A7B0A1",
+  textFaint: "#A7B0A1",
+
+  border: "#74826F",
+  divider: "rgba(216, 208, 189, 0.12)",
+
+  success: "#8DB58A",
+  successBg: "#243B2C",
+  danger: "#E58A6E",         // Ember
+  dangerBg: "#3D2620",
+  warning: "#E3A84B",        // Amber
+  warningText: "#E3A84B",
+  warningBg: "#3A2F1A",
+  notice: "#D8D0BD",
+  noticeBg: "#263C30",
+
+  shadow: "#000000",
+};
+
+export type Palette = typeof dayColors;
+export type ThemeMode = "day" | "night";
+let currentMode: ThemeMode = "day";
+
+/** The live tokens. Read them at render time or inside themed(); never copy a value into a module-level constant. */
+export const colors: Palette = { ...dayColors };
+
+/** Switches every token in place. ThemeContext calls this, then remounts the screens so they redraw. */
+export function applyThemeMode(mode: ThemeMode): void {
+  currentMode = mode;
+  Object.assign(colors, mode === "night" ? nightColors : dayColors);
+}
+
+/**
+ * Styles that follow the theme: built on first use in each mode, then reused.
+ * Usage: const styles = themed(() => StyleSheet.create({ ... }));
+ */
+export function themed<T extends object>(build: () => T): T {
+  const cache: Partial<Record<ThemeMode, T>> = {};
+  return new Proxy({} as T, {
+    get: (_, key) => (cache[currentMode] ??= build())[key as keyof T],
+  });
+}
 
 /**
  * Font files in assets/fonts (SIL Open Font License), loaded in App.tsx.
@@ -101,13 +166,13 @@ export const touch = {
 };
 
 /** In daylight, edges do most of the work; the shadow only lifts cards slightly off the page. */
-export const cardShadow = {
+export const cardShadow = () => ({
   shadowColor: colors.shadow,
   shadowOpacity: 0.08,
   shadowRadius: 6,
   shadowOffset: { width: 0, height: 2 },
   elevation: 1,
-};
+});
 
 /** Short, consistent motion. Everything non-essential turns off with the phone's reduce-motion setting. */
 export const motion = {

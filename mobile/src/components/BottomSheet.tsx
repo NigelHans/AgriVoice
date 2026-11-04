@@ -8,7 +8,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReduceMotion } from "./motion";
-import { colors, radius, spacing } from "../theme";
+import { colors, radius, spacing, themed } from "../theme";
 
 /** closeLabel: translated text a screen reader announces for the backdrop (e.g. "Close") */
 type Props = { visible: boolean; onClose: () => void; closeLabel: string; children: React.ReactNode };
@@ -76,11 +76,11 @@ export default function BottomSheet({ visible, onClose, closeLabel, children }: 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   backdrop:   { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
   keyboardArea: { flex: 1, justifyContent: "flex-end" },
   sheet:      { maxHeight: "88%", backgroundColor: colors.card,
                 borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, borderColor: colors.glassBorder },
   handleArea: { alignItems: "center", paddingVertical: spacing.md },
   handle:     { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.surfaceRaised },
-});
+}));

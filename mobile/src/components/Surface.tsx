@@ -6,7 +6,7 @@
  */
 import React from "react";
 import { View, StyleSheet, type ViewProps } from "react-native";
-import { colors, radius, spacing, cardShadow } from "../theme";
+import { colors, radius, spacing, cardShadow, themed } from "../theme";
 
 type Props = ViewProps & { variant?: "base" | "raised" | "glass" };
 
@@ -14,9 +14,9 @@ export default function Surface({ variant = "base", style, ...props }: Props) {
   return <View style={[styles.surface, styles[variant], style]} {...props} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   surface: { borderRadius: radius.lg, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.highlight },
-  base:    { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder, ...cardShadow },
-  raised:  { backgroundColor: colors.surfaceRaised, ...cardShadow },
+  base:    { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder, ...cardShadow() },
+  raised:  { backgroundColor: colors.surfaceRaised, ...cardShadow() },
   glass:   { backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder },
-});
+}));

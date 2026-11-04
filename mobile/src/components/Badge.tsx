@@ -5,16 +5,17 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors, radius, spacing, type, fonts } from "../theme";
+import { colors, radius, spacing, type, fonts, themed } from "../theme";
 
 type Tone = "success" | "warning" | "danger" | "neutral";
 
-const TONES: Record<Tone, { bg: string; fg: string }> = {
+// A function, so the colors follow the current theme
+const tones = (): Record<Tone, { bg: string; fg: string }> => ({
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.warningBg, fg: colors.warningText },
   danger:  { bg: colors.dangerBg, fg: colors.danger },
   neutral: { bg: colors.sand, fg: colors.text },
-};
+});
 
 type Props = {
   label: string;
@@ -23,7 +24,7 @@ type Props = {
 };
 
 export default function Badge({ label, tone = "neutral", icon }: Props) {
-  const { bg, fg } = TONES[tone];
+  const { bg, fg } = tones()[tone];
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       {icon && <MaterialCommunityIcons name={icon} size={16} color={fg} style={styles.icon} />}
@@ -32,9 +33,9 @@ export default function Badge({ label, tone = "neutral", icon }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   badge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center",
            paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.pill },
   icon:  { marginRight: spacing.xs },
   label: { ...type.caption, fontFamily: fonts.bold },
-});
+}));

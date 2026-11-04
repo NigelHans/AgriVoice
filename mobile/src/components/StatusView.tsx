@@ -6,7 +6,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "./Button";
 import Skeleton from "./Skeleton";
-import { colors, radius, spacing, type, fonts } from "../theme";
+import { colors, radius, spacing, type, fonts, themed } from "../theme";
 
 type Props = {
   loading?: boolean;
@@ -55,7 +55,7 @@ export default function StatusView({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   container:       { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl,
                      backgroundColor: colors.background },
   iconCircle:      { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
@@ -70,4 +70,4 @@ const styles = StyleSheet.create({
   skeletons:       { flexGrow: 1, padding: spacing.lg, gap: spacing.md, backgroundColor: colors.background },
   skeletonBar:     { borderRadius: radius.xl },
   skeletonCard:    { borderRadius: radius.lg },
-});
+}));

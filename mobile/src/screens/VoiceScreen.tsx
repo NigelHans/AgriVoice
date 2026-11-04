@@ -25,7 +25,7 @@ import {
 import Svg, { Circle } from "react-native-svg";
 import { Audio } from "expo-av";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { sendVoiceQuery, sendTextQuery } from "../services/api";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
@@ -40,7 +40,7 @@ import { useReduceMotion } from "../components/motion";
 import { appendHistory } from "../services/historyStorage";
 import { speak, stopSpeaking } from "../services/speech";
 import type { AssistantReply } from "../types";
-import { colors, spacing, radius, type, fonts } from "../theme";
+import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -83,6 +83,13 @@ export default function VoiceScreen() {
   // Exact WFP spelling goes to the backend; the label is display-only
   const { region } = useRegion();
   const regionLabel = getRegionLabel(region);
+
+  // "Ask about this price" on Market opens Voice with a question ready to send
+  const route = useRoute();
+  const prefill = route.params as { question?: string; at?: number } | undefined;
+  useEffect(() => {
+    if (prefill?.question) setTypedText(prefill.question);
+  }, [prefill?.at]);
 
   // Read-aloud state. Each reading gets a number, so a stopped reading can't clear a newer one.
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -503,7 +510,7 @@ function priceLabel(reply: AssistantReply, t: Translate): string {
   }
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => StyleSheet.create({
   screen:        { flex: 1, backgroundColor: colors.background },
   scroll:        { flex: 1 },
   container:     { flexGrow: 1, padding: spacing.lg, gap: spacing.xl },
@@ -567,4 +574,4 @@ const styles = StyleSheet.create({
                    ...type.body, color: colors.text },
   sendButton:    { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   disabled:      { opacity: 0.45 },
-});
+}));

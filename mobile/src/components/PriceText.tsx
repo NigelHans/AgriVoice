@@ -5,7 +5,7 @@
  */
 import React from "react";
 import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-import { colors, spacing, type } from "../theme";
+import { colors, spacing, type, themed } from "../theme";
 
 type Props = {
   value: number | null;
@@ -18,7 +18,7 @@ type Props = {
 export default function PriceText({ value, unit, size = "display", color = colors.price, style }: Props) {
   const face = type[size];
   if (value === null) return <Text style={[face, { color }]}>—</Text>;
-  const amount = value.toLocaleString();
+  const amount = formatAmount(value);
   return (
     <View style={[styles.row, style]} accessible accessibilityLabel={`₱${amount}${unit ? ` / ${unit}` : ""}`}>
       <Text style={[styles.peso, { fontSize: Math.round(face.fontSize * 0.6), lineHeight: face.lineHeight, color }]}>₱</Text>
@@ -28,8 +28,13 @@ export default function PriceText({ value, unit, size = "display", color = color
   );
 }
 
-const styles = StyleSheet.create({
+/** Whole pesos stay whole ("52"); anything else shows centavos ("52.40"). */
+export function formatAmount(value: number): string {
+  return value.toLocaleString("en-PH", { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 });
+}
+
+const styles = themed(() => StyleSheet.create({
   row:  { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap" },
   peso: { fontWeight: "700", marginRight: 2 },   // system font, so fontWeight works here
   unit: { ...type.caption, color: colors.textSecondary, marginLeft: spacing.xs },
-});
+}));

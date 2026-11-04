@@ -1,14 +1,10 @@
 /**
- * Card — the standard white, rounded, lightly raised surface.
+ * Card — the standard surface (a base Surface), kept so existing screens need no changes.
  */
 import React from "react";
-import { View, StyleSheet, type ViewProps } from "react-native";
-import { colors, radius, spacing, cardShadow } from "../theme";
+import type { ViewProps } from "react-native";
+import Surface from "./Surface";
 
-export default function Card({ style, ...props }: ViewProps) {
-  return <View style={[styles.card, style]} {...props} />;
+export default function Card(props: ViewProps) {
+  return <Surface variant="base" {...props} />;
 }
-
-const styles = StyleSheet.create({
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg, ...cardShadow },
-});

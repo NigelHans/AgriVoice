@@ -13,7 +13,7 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.warningBg, fg: colors.warningText },
   danger:  { bg: colors.dangerBg, fg: colors.danger },
-  neutral: { bg: colors.sand, fg: colors.textSecondary },
+  neutral: { bg: colors.sand, fg: colors.text },
 };
 
 type Props = {

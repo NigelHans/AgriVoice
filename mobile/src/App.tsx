@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
+import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -12,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "./context/LanguageContext";
 import { RegionProvider } from "./context/RegionContext";
 import { useT } from "./i18n";
+import GlassTabBar from "./components/GlassTabBar";
 
 // Screens
 import VoiceScreen from "./screens/VoiceScreen";
@@ -31,11 +32,11 @@ const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Settings: "cog-outline",
 };
 
-// Screen backgrounds and borders behind every tab follow the AgriVoice palette
+// Dark navigation theme: screen backgrounds and borders behind every tab follow the V2 palette
 const NAV_THEME = {
-  ...DefaultTheme,
+  ...DarkTheme,
   colors: {
-    ...DefaultTheme.colors,
+    ...DarkTheme.colors,
     primary: colors.primary,
     background: colors.background,
     card: colors.card,
@@ -65,14 +66,14 @@ function AppTabs() {
   const t = useT();
   return (
         <Tab.Navigator
+          tabBar={(props) => <GlassTabBar {...props} />}
           screenOptions={({ route }) => ({
-            headerStyle: { backgroundColor: colors.primary },
-            headerTintColor: colors.onPrimary,
+            headerStyle: { backgroundColor: colors.background },
+            headerShadowVisible: false,
+            headerTintColor: colors.text,
             headerTitleStyle: { ...type.title, fontWeight: "700" },
             tabBarActiveTintColor: colors.primary,
-            tabBarInactiveTintColor: colors.textMuted,
-            tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.divider },
-            tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+            tabBarInactiveTintColor: colors.textSecondary,
             tabBarIcon: ({ color, focused }) => (
               <MaterialCommunityIcons
                 name={ICON_MAP[route.name]}

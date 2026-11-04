@@ -1,55 +1,62 @@
 /**
- * AgriVoice design tokens: one palette, type scale, spacing and touch size for every screen.
+ * AgriVoice V2 "Premium Agritech" design tokens — dark first.
  *
- * Contrast rules (WCAG, measured): every text color below passes 4.5:1 on `card` and
- * `background`. `warning` (Harvest Amber) and `decor` (Light Soil) fail as text: use them only
- * as fills, borders, icons or illustrations, with `text`/`warningText` for any words on them.
+ * Contrast rules (WCAG, measured): every text color passes 4.5:1 on `background` and `card`.
+ * Earth Brown (`earth`, `decor`) and Moss (`surfaceRaised`) fail as text: use them only for
+ * surfaces, lines, textures and illustrations. Words on Warm Clay use `onPrimary` (dark).
+ * Token names from V1 are kept, so every screen keeps working while it is redesigned.
  */
 export const colors = {
-  // Brand: green dominant, brown as a quiet accent
-  primary: "#245C3A",        // Forest Green: header, primary buttons, active states
-  secondary: "#477A50",      // Agricultural Green: secondary actions, neutral icons
-  accent: "#8B6242",         // Earth Brown: small accent text (dates, sources), never large areas
-  decor: "#B99A78",          // Light Soil: illustrations and decoration only — not for text
-  sand: "#E9DDCC",           // Soft Sand: subtle panels and dividers
-  onPrimary: "#FFFFFF",      // text and icons on primary / secondary
+  // Brand accents: clay leads, brown supports, greens stay calm (no neon)
+  primary: "#C2A47C",        // Warm Clay: active states, primary buttons, key numbers
+  secondary: "#8DB58A",      // Sage: secondary actions, neutral icons
+  accent: "#C2A47C",         // small accent text (dates, sources); brown is too dark for text here
+  earth: "#806044",          // Earth Brown: lines, timeline rails, textures — not for text
+  decor: "#806044",          // illustrations only — not for text
+  sand: "#30483A",           // neutral panels (was Soft Sand in V1)
+  onPrimary: "#111B17",      // text and icons on clay / sage / ember fills
 
-  // Surfaces
-  background: "#F7F7F0",     // Warm Ivory: screen background
-  card: "#FFFFFF",
+  // Surfaces: layered greens, never pure black
+  background: "#111B17",     // Midnight Forest
+  card: "#1D3027",           // Deep Olive
+  surfaceRaised: "#30483A",  // Moss: raised, pressed or selected surfaces
+  glass: "rgba(29, 48, 39, 0.72)",        // translucent Deep Olive for floating UI
+  glassBorder: "rgba(216, 208, 189, 0.12)",
+  highlight: "rgba(216, 208, 189, 0.08)", // 1px top edge that gives cards depth
 
-  // Text (Charcoal and two lighter steps, all ≥ 5:1 on white and ivory)
-  text: "#343C35",
-  textSecondary: "#535B54",
-  textMuted: "#636B64",
-  textFaint: "#636B64",      // kept for existing screens; same as textMuted so small text stays readable
+  // Text
+  text: "#D8D0BD",           // Natural Linen
+  textSecondary: "#A7B0A1",
+  textMuted: "#A7B0A1",
+  textFaint: "#A7B0A1",
 
   // Lines
-  border: "#8F877B",         // input and control outlines (≥ 3:1 against white)
-  divider: "#E9DDCC",        // decorative separators
+  border: "#74826F",         // input and control outlines (≥ 3:1 on card and background)
+  divider: "rgba(216, 208, 189, 0.12)",
 
   // Status
-  success: "#245C3A",
-  successBg: "#E3EFE5",
-  danger: "#B3261E",         // errors, delete, recording
-  dangerBg: "#FBE9E7",
-  warning: "#E7A33E",        // Harvest Amber: fills, edges and icons only
-  warningText: "#7A4E0A",    // text that means "warning" or "old"
-  warningBg: "#FBEFD8",
-  notice: "#5E4630",         // text on noticeBg (e.g. weather fallback notice)
-  noticeBg: "#E9DDCC",
+  success: "#8DB58A",
+  successBg: "#243B2C",
+  danger: "#E58A6E",         // Ember: recording, errors, delete
+  dangerBg: "#3D2620",
+  warning: "#E3A84B",        // Amber: warnings (readable as text on dark)
+  warningText: "#E3A84B",
+  warningBg: "#3A2F1A",
+  notice: "#D8D0BD",
+  noticeBg: "#30483A",
 
   shadow: "#000000",
 };
 
-/** Font sizes with comfortable line heights. Nothing smaller than `caption`. */
+/** Refined scale: large numbers for prices and temperatures, a letter-spaced overline for labels. */
 export const type = {
+  overline:  { fontSize: 12, lineHeight: 16, letterSpacing: 1.2, fontWeight: "700" as const, textTransform: "uppercase" as const },
   caption:   { fontSize: 14, lineHeight: 20 },
   body:      { fontSize: 16, lineHeight: 24 },
   bodyLarge: { fontSize: 18, lineHeight: 26 },
   title:     { fontSize: 20, lineHeight: 28 },
-  headline:  { fontSize: 24, lineHeight: 32 },
-  display:   { fontSize: 32, lineHeight: 40 },
+  headline:  { fontSize: 28, lineHeight: 34, letterSpacing: -0.3 },
+  display:   { fontSize: 40, lineHeight: 46, letterSpacing: -0.8 },
 };
 
 export const spacing = {
@@ -62,9 +69,10 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   pill: 999,
 };
 
@@ -73,11 +81,19 @@ export const touch = {
   min: 48,
 };
 
-/** The one card shadow, so every raised surface looks the same on iOS and Android. */
+/** Depth on dark comes from a light top edge plus a soft shadow (Android shadows are faint on dark). */
 export const cardShadow = {
   shadowColor: colors.shadow,
-  shadowOpacity: 0.08,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 2 },
-  elevation: 2,
+  shadowOpacity: 0.35,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 4,
+};
+
+/** Short, consistent motion. Everything non-essential turns off with the phone's reduce-motion setting. */
+export const motion = {
+  press: 120,        // press-in / press-out
+  enter: 220,        // card entrance
+  stagger: 40,       // delay between successive cards
+  pressScale: 0.97,
 };

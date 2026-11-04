@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   container:       { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl,
                      backgroundColor: colors.background },
   iconCircle:      { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
-                     backgroundColor: colors.successBg },
+                     backgroundColor: colors.surfaceRaised },
   iconCircleError: { backgroundColor: colors.dangerBg },
   title:           { ...type.title, fontWeight: "700", color: colors.text, marginTop: spacing.lg, textAlign: "center" },
   titleError:      { color: colors.danger },

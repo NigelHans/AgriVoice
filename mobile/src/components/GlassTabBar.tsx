@@ -88,7 +88,7 @@ export default function GlassTabBar({ state, descriptors, navigation, insets }: 
 const BAR_PADDING = spacing.xs;
 
 const styles = StyleSheet.create({
-  outer:     { backgroundColor: colors.background, paddingHorizontal: spacing.md, paddingTop: spacing.xs },
+  outer:     { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   bar:       { flexDirection: "row", padding: BAR_PADDING, borderRadius: radius.xl, backgroundColor: colors.glass,
                borderWidth: 1, borderColor: colors.glassBorder },
   highlight: { position: "absolute", top: BAR_PADDING, bottom: BAR_PADDING, left: BAR_PADDING, borderRadius: radius.lg,

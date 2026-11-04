@@ -493,7 +493,7 @@ function formatValue(value: number | null, unit: string): string {
 }
 
 const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: colors.background },
+  container:     { flex: 1 },
   content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   locationRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   location:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexShrink: 1 },

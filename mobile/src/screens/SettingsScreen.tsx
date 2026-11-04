@@ -195,7 +195,7 @@ function OptionRow({ label, selected, onPress }: { label: string; selected: bool
 }
 
 const styles = StyleSheet.create({
-  container:          { flex: 1, backgroundColor: colors.background },
+  container:          { flex: 1 },
   content:            { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
 
   bentoRow:           { flexDirection: "row", gap: spacing.md },

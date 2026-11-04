@@ -13,6 +13,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { RegionProvider } from "./context/RegionContext";
 import { useT } from "./i18n";
 import GlassTabBar from "./components/GlassTabBar";
+import ScreenBackground from "./components/ScreenBackground";
 
 // Screens
 import VoiceScreen from "./screens/VoiceScreen";
@@ -46,7 +47,7 @@ const NAV_THEME = {
   colors: {
     ...DarkTheme.colors,
     primary: colors.primary,
-    background: colors.background,
+    background: "transparent",   // ScreenBackground shows through
     card: colors.card,
     text: colors.text,
     border: colors.divider,
@@ -58,6 +59,7 @@ export default function App() {
     <SafeAreaProvider>
       <LanguageProvider>
       <RegionProvider>
+      <ScreenBackground />
       <NavigationContainer theme={NAV_THEME}>
         <StatusBar style="light" />
         <AppTabs />
@@ -76,7 +78,7 @@ function AppTabs() {
         <Tab.Navigator
           tabBar={(props) => <GlassTabBar {...props} />}
           screenOptions={({ route }) => ({
-            headerStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: "transparent" },
             headerShadowVisible: false,
             headerTintColor: colors.text,
             headerTitleStyle: { ...type.title, fontWeight: "700" },

@@ -276,7 +276,7 @@ function languageLabel(code: string): string {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: colors.background },
+  container:       { flex: 1 },
   toolbar:         { alignItems: "flex-end", paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   emptyList:       { flexGrow: 1 },
   list:            { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },

@@ -1,5 +1,5 @@
 /**
- * AgriVoice V2 "Premium Agritech" design tokens — dark first.
+ * AgriVoice V2.1 "Organic Liquid Glass" design tokens — dark first.
  *
  * Contrast rules (WCAG, measured): every text color passes 4.5:1 on `background` and `card`.
  * Earth Brown (`earth`, `decor`) and Moss (`surfaceRaised`) fail as text: use them only for
@@ -20,11 +20,19 @@ export const colors = {
   background: "#111B17",     // Midnight Forest
   card: "#1D3027",           // Deep Olive
   surfaceRaised: "#30483A",  // Moss: raised, pressed or selected surfaces
-  glass: "rgba(29, 48, 39, 0.72)",        // translucent Deep Olive for floating UI
-  glassBorder: "rgba(216, 208, 189, 0.12)",
+  glass: "rgba(29, 48, 39, 0.55)",        // soft glass: tiles and bars over the static background
+  glassStrong: "rgba(29, 48, 39, 0.88)",  // dock and sheets without blur (Android); labels stay ≥ 4.5:1 over any content
+  glassOverBlur: "rgba(29, 48, 39, 0.62)",// tint laid over real blur (iOS)
+  glassBorder: "rgba(216, 208, 189, 0.14)",
   highlight: "rgba(216, 208, 189, 0.08)", // 1px top edge that gives cards depth
   sheen: "rgba(255, 255, 255, 0.25)",     // glossy top edge on solid clay / ember controls
   scrim: "rgba(0, 0, 0, 0.55)",           // dims the screen behind sheets and overlays
+  white: "#FFFFFF",                       // only for the sheen gradient (used at low opacity)
+
+  // Background depth and button gradient
+  backgroundTop: "#1A2A22",               // top of the screen gradient
+  backgroundBottom: "#0E1713",            // bottom of the screen gradient
+  clayDeep: "#A98B64",                    // lower end of the clay button gradient (dark text 5.5:1)
 
   // Text
   text: "#D8D0BD",           // Natural Linen
@@ -97,5 +105,16 @@ export const motion = {
   press: 120,        // press-in / press-out
   enter: 220,        // card entrance
   stagger: 40,       // delay between successive cards
-  pressScale: 0.97,
+  pressScale: 0.97, pressSpeed: 40, pressBounce: 6,
+};
+
+/**
+ * Glass settings. Real blur is used only on iOS (expo-blur); Android uses the frosted look
+ * (strong tint, sheen, fine border), because expo-blur's Android blur is experimental in SDK 51.
+ * Set blur to false to turn real blur off everywhere.
+ */
+export const glass = {
+  blur: true,
+  intensity: 50,
+  sheenOpacity: 0.1,   // strength of the light sheen across the top of glass and cards
 };

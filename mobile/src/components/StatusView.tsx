@@ -56,8 +56,7 @@ export default function StatusView({
 }
 
 const styles = StyleSheet.create({
-  container:       { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl,
-                     backgroundColor: colors.background },
+  container:       { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: spacing.xl },
   iconCircle:      { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
                      backgroundColor: colors.surfaceRaised },
   iconCircleError: { backgroundColor: colors.dangerBg },
@@ -67,7 +66,7 @@ const styles = StyleSheet.create({
   detail:          { ...type.caption, color: colors.textMuted, marginTop: spacing.sm, textAlign: "center" },
   action:          { marginTop: spacing.xl },
   secondary:       { marginTop: spacing.sm },
-  skeletons:       { flexGrow: 1, padding: spacing.lg, gap: spacing.md, backgroundColor: colors.background },
+  skeletons:       { flexGrow: 1, padding: spacing.lg, gap: spacing.md },
   skeletonBar:     { borderRadius: radius.xl },
   skeletonCard:    { borderRadius: radius.lg },
 });

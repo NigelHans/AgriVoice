@@ -1,7 +1,7 @@
 /**
  * Button — every tappable action: at least 48dp tall, with an optional icon and loading state.
- *   primary   filled clay with dark text (main action)
- *   secondary raised surface with a clay outline
+ *   primary   clay gradient with a light sheen and dark text (main action)
+ *   secondary glass pill with a clay outline
  *   text      clay text only (low-emphasis action)
  *   danger    ember text only (delete / clear)
  */
@@ -9,6 +9,8 @@ import React from "react";
 import { Text, ActivityIndicator, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import PressableScale from "./PressableScale";
+import GradientFill from "./GradientFill";
+import Sheen from "./Sheen";
 import { colors, radius, spacing, touch, type } from "../theme";
 
 type Variant = "primary" | "secondary" | "text" | "danger";
@@ -45,6 +47,12 @@ export default function Button({
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       style={[styles.base, styles[variant], inactive && styles.inactive, style]}
     >
+      {variant === "primary" && (
+        <>
+          <GradientFill from={colors.primary} to={colors.clayDeep} direction="vertical" />
+          <Sheen radius={radius.pill} />
+        </>
+      )}
       {loading ? (
         <ActivityIndicator color={color} />
       ) : (
@@ -58,8 +66,8 @@ export default function Button({
 const styles = StyleSheet.create({
   base:      { minHeight: touch.min, flexDirection: "row", alignItems: "center", justifyContent: "center",
                paddingHorizontal: spacing.xl, borderRadius: radius.pill },
-  primary:   { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.primary },
+  primary:   { backgroundColor: colors.primary, overflow: "hidden" },
+  secondary: { backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.primary },
   text:      { paddingHorizontal: spacing.md },
   danger:    { paddingHorizontal: spacing.md },
   inactive:  { opacity: 0.45 },

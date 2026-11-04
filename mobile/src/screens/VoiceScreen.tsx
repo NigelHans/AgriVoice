@@ -457,7 +457,7 @@ function priceLabel(reply: AssistantReply, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
-  screen:        { flex: 1, backgroundColor: colors.background },
+  screen:        { flex: 1 },
   container:     { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
 
   contextBar:    { gap: spacing.md },

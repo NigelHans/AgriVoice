@@ -306,7 +306,7 @@ function formatPriceMonth(value: string): string | null {
 }
 
 const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: colors.background },
+  container:     { flex: 1 },
   content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
 
   searchBox:     { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: 0, paddingHorizontal: spacing.md,

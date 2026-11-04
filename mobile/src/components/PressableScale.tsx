@@ -1,6 +1,6 @@
 /**
  * PressableScale — tactile press feedback: shrinks slightly while pressed, springs back on release.
- * Accepts every Pressable prop; still when the phone asks for reduced motion.
+ * Spring physics, so release has a slight natural bounce. Still when the phone asks for reduced motion.
  */
 import React, { useRef } from "react";
 import { Animated, Pressable, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
@@ -17,7 +17,7 @@ export default function PressableScale({ style, onPressIn, onPressOut, disabled,
 
   const animate = (toValue: number) => {
     if (reduceMotion) return;
-    Animated.timing(scale, { toValue, duration: motion.press, useNativeDriver: true }).start();
+    Animated.spring(scale, { toValue, speed: motion.pressSpeed, bounciness: motion.pressBounce, useNativeDriver: true }).start();
   };
 
   return (

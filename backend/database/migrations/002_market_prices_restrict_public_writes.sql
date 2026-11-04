@@ -114,7 +114,7 @@ BEGIN
         RAISE EXCEPTION 'PostgreSQL 15 or newer required; this is %', current_setting('server_version');
     END IF;
     IF current_setting('server_version_num')::int >= 170000 THEN
-        tbl_write := tbl_write || 'MAINTAIN';
+        tbl_write := array_append(tbl_write, 'MAINTAIN');   -- not || 'MAINTAIN': that parses as an array literal and fails
     END IF;
 
     -- Objects and roles
@@ -327,7 +327,7 @@ DECLARE
     fingerprint text;
 BEGIN
     IF current_setting('server_version_num')::int >= 170000 THEN
-        tbl_write := tbl_write || 'MAINTAIN';
+        tbl_write := array_append(tbl_write, 'MAINTAIN');   -- not || 'MAINTAIN': that parses as an array literal and fails
     END IF;
 
     -- Effective privileges: has_*_privilege counts direct grants from any grantor, grants

@@ -23,6 +23,7 @@ export const colors = {
   glass: "rgba(29, 48, 39, 0.72)",        // translucent Deep Olive for floating UI
   glassBorder: "rgba(216, 208, 189, 0.12)",
   highlight: "rgba(216, 208, 189, 0.08)", // 1px top edge that gives cards depth
+  sheen: "rgba(255, 255, 255, 0.25)",     // glossy top edge on solid clay / ember controls
 
   // Text
   text: "#D8D0BD",           // Natural Linen

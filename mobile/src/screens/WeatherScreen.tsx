@@ -12,9 +12,12 @@ import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type StringKey, type Translate, type UiMessage } from "../i18n";
 import type { DailyForecast } from "../types";
 import StatusView from "../components/StatusView";
-import Card from "../components/Card";
+import Surface from "../components/Surface";
 import Button from "../components/Button";
 import SectionHeader from "../components/SectionHeader";
+import FadeInView from "../components/FadeInView";
+import GradientFill from "../components/GradientFill";
+import PressableScale from "../components/PressableScale";
 import { colors, spacing, radius, type } from "../theme";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -228,16 +231,16 @@ export default function WeatherScreen() {
       }
     >
       <View style={styles.locationRow}>
-        <MaterialCommunityIcons name="map-marker" size={20} color={colors.accent} />
+        <MaterialCommunityIcons name="map-marker" size={20} color={colors.primary} />
         <Text style={styles.location}>
           {source?.kind === "region" ? getRegionLabel(source.region) : source?.place || t("weather.yourLocation")}
         </Text>
       </View>
 
       {source?.kind === "region" && (
-        <View style={styles.notice}>
+        <Surface variant="glass" style={styles.notice}>
           <View style={styles.noticeRow}>
-            <MaterialCommunityIcons name="crosshairs-off" size={20} color={colors.notice} />
+            <MaterialCommunityIcons name="crosshairs-off" size={20} color={colors.textSecondary} />
             <Text style={styles.noticeText}>
               {t(source.reason)}{"\n"}
               {t("weather.fallbackNotice", { city: REGION_CENTERS[source.region]?.city ?? "—" })}
@@ -251,85 +254,145 @@ export default function WeatherScreen() {
             disabled={refreshing}
             style={styles.noticeButton}
           />
-        </View>
+        </Surface>
       )}
 
       {refreshError && (
-        <View style={styles.banner}>
+        <Surface style={styles.banner}>
           <MaterialCommunityIcons name="wifi-off" size={20} color={colors.danger} />
           <Text style={styles.bannerText}>
             {t("weather.refreshFailed")} {t(refreshError.key, refreshError.values)}
           </Text>
-        </View>
+        </Surface>
       )}
 
       {severeDays.length > 0 && (
-        <View style={styles.warning} accessibilityRole="alert">
-          <MaterialCommunityIcons name="alert" size={26} color={colors.warningText} />
-          <View style={styles.warningBody}>
-            <Text style={styles.warningTitle}>{t("weather.warningTitle")}</Text>
-            <Text style={styles.warningText}>{t("weather.warningDays", { days: severeDays.join(", ") })}</Text>
+        <FadeInView>
+          <View style={styles.warning} accessibilityRole="alert">
+            <View style={styles.warningIcon}>
+              <MaterialCommunityIcons name="weather-lightning-rainy" size={26} color={colors.onPrimary} />
+            </View>
+            <View style={styles.warningBody}>
+              <Text style={styles.warningTitle}>{t("weather.warningTitle")}</Text>
+              <Text style={styles.warningText}>{t("weather.warningDays", { days: severeDays.join(", ") })}</Text>
+            </View>
           </View>
-        </View>
+        </FadeInView>
       )}
 
       {forecast.length === 0 && <StatusView icon="cloud-outline" title={t("weather.empty")} />}
 
-      {today && <TodayCard day={today} severe={isSevere(today)} t={t} />}
-      {nextDays.length > 0 && <SectionHeader title={t("weather.nextDays")} />}
-      {nextDays.map((day) => <DayCard key={day.date} day={day} severe={isSevere(day)} t={t} />)}
+      {today && (
+        <FadeInView index={1}>
+          <TodayHero day={today} severe={isSevere(today)} t={t} />
+        </FadeInView>
+      )}
+
+      {nextDays.length > 0 && (
+        <FadeInView index={2}>
+          <SectionHeader title={t("weather.nextDays")} />
+          <DayTimeline days={nextDays} isSevere={isSevere} t={t} />
+        </FadeInView>
+      )}
     </ScrollView>
   );
 }
 
-// The first forecast day, large: icon, temperature, description, rain chance and wind
-function TodayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
+// Today, large, on a soft gradient (amber-tinted when it is a warning day)
+function TodayHero({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
   const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
   const { title, subtitle } = dayLabel(day.date, t);
   return (
-    <Card style={[styles.todayCard, severe && styles.severeEdge]}>
+    <View style={[styles.hero, severe && styles.heroSevere]}>
+      <GradientFill from={severe ? colors.warningBg : colors.surfaceRaised} to={colors.card} />
       <View style={styles.titleRow}>
-        <Text style={styles.todayTitle}>{title}</Text>
-        {subtitle !== "" && <Text style={styles.todaySub}>{subtitle}</Text>}
+        <Text style={styles.heroTitle}>{title}</Text>
+        {subtitle !== "" && <Text style={styles.heroSub}>{subtitle}</Text>}
       </View>
-      <View style={styles.todayMain}>
-        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={72} color={severe ? colors.warningText : colors.primary} />
-        <View style={styles.todayInfo}>
+      <View style={styles.heroMain}>
+        <View style={styles.heroInfo}>
           <Text style={styles.statLabel}>{t("weather.tempLabel")}</Text>
-          <Text style={styles.todayTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
-          <Text style={[styles.todayDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
+          <View style={styles.tempRow}>
+            <Text style={styles.heroTemp}>{formatValue(day.temp_max, "°")}</Text>
+            <Text style={styles.heroMin}>/ {formatValue(day.temp_min, "°C")}</Text>
+          </View>
+          <Text style={[styles.heroDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
         </View>
+        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={88} color={severe ? colors.warningText : colors.primary} />
       </View>
       <View style={styles.stats}>
         <Stat icon="water-percent" label={t("weather.rainLabel")} value={formatValue(day.rain_probability, "%")} highlight={severe} />
         <Stat icon="weather-windy" label={t("weather.windLabel")} value={formatValue(day.wind_speed, " km/h")} />
       </View>
-    </Card>
+    </View>
   );
 }
 
-// One of the following days, compact, with the same values in the same order
-function DayCard({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
+// The following days as a horizontal row of day pills; the tapped day's details show underneath
+function DayTimeline({ days, isSevere, t }: { days: DailyForecast[]; isSevere: (day: DailyForecast) => boolean; t: Translate }) {
+  const [selectedDate, setSelectedDate] = useState(days[0]?.date);
+  // A refreshed forecast may no longer contain the selected day; fall back to the first one
+  const selected = days.find((d) => d.date === selectedDate) ?? days[0];
+  return (
+    <View style={styles.timeline}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+        {days.map((day) => {
+          const severe = isSevere(day);
+          const active = day.date === selected.date;
+          const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
+          const { title } = dayLabel(day.date, t);
+          return (
+            <PressableScale
+              key={day.date}
+              onPress={() => setSelectedDate(day.date)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${title}. ${weather ? t(weather.label) : ""}`}
+              style={[styles.pill, active && styles.pillActive, severe && styles.pillSevere]}
+            >
+              <Text style={[styles.pillDay, active && styles.pillDayActive]} numberOfLines={2}>{title}</Text>
+              <MaterialCommunityIcons
+                name={weather?.icon ?? "thermometer"}
+                size={30}
+                color={severe ? colors.warningText : active ? colors.primary : colors.textSecondary}
+              />
+              <Text style={styles.pillTemp}>{formatValue(day.temp_max, "°")}</Text>
+              <View style={styles.pillRainRow}>
+                <MaterialCommunityIcons name="water-percent" size={14} color={severe ? colors.warningText : colors.secondary} />
+                <Text style={[styles.pillRain, severe && styles.severeText]}>{formatValue(day.rain_probability, "%")}</Text>
+              </View>
+            </PressableScale>
+          );
+        })}
+      </ScrollView>
+      {selected && <DayDetail day={selected} severe={isSevere(selected)} t={t} />}
+    </View>
+  );
+}
+
+// Full values for the selected day, in the same order as the Today card
+function DayDetail({ day, severe, t }: { day: DailyForecast; severe: boolean; t: Translate }) {
   const weather = day.weather_code !== null ? WEATHER_CODES[day.weather_code] : undefined;
   const { title, subtitle } = dayLabel(day.date, t);
   return (
-    <Card style={[styles.dayCard, severe && styles.severeEdge]}>
-      <View style={styles.dayTop}>
-        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={36} color={severe ? colors.warningText : colors.primary} />
-        <View style={styles.dayInfo}>
-          <View style={styles.titleRow}>
-            <Text style={styles.dayTitle}>{title}</Text>
-            {subtitle !== "" && <Text style={styles.daySub}>{subtitle}</Text>}
-          </View>
-          <Text style={[styles.dayDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
+    <Surface style={[styles.detail, severe && styles.severeEdge]}>
+      <View style={styles.titleRow}>
+        <Text style={styles.detailTitle}>{title}</Text>
+        {subtitle !== "" && <Text style={styles.heroSub}>{subtitle}</Text>}
+      </View>
+      <View style={styles.detailMain}>
+        <MaterialCommunityIcons name={weather?.icon ?? "thermometer"} size={40} color={severe ? colors.warningText : colors.primary} />
+        <View style={styles.detailInfo}>
+          <Text style={[styles.detailDesc, severe && styles.severeText]}>{weather ? t(weather.label) : "—"}</Text>
+          <Text style={styles.statLabel}>{t("weather.tempLabel")}</Text>
+          <Text style={styles.detailTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
         </View>
-        <Text style={styles.dayTemp}>{formatValue(day.temp_max, "°")} / {formatValue(day.temp_min, "°C")}</Text>
       </View>
       <View style={styles.stats}>
         <Stat icon="water-percent" label={t("weather.rainLabel")} value={formatValue(day.rain_probability, "%")} highlight={severe} />
         <Stat icon="weather-windy" label={t("weather.windLabel")} value={formatValue(day.wind_speed, " km/h")} />
       </View>
-    </Card>
+    </Surface>
   );
 }
 
@@ -344,7 +407,6 @@ function Stat({ icon, label, value, highlight = false }: { icon: IconName; label
     </View>
   );
 }
-
 
 // Coordinates from GPS, or a GpsError whose reasonKey tells the farmer why not
 async function getGpsCoords(): Promise<Coords> {
@@ -431,50 +493,65 @@ function formatValue(value: number | null, unit: string): string {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  content:      { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xl },
-  locationRow:  { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.md },
-  location:     { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexShrink: 1 },
+  container:     { flex: 1, backgroundColor: colors.background },
+  content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  locationRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  location:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flexShrink: 1 },
 
-  notice:       { backgroundColor: colors.noticeBg, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
-  noticeRow:    { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  noticeText:   { ...type.caption, color: colors.notice, flex: 1 },
-  noticeButton: { alignSelf: "flex-start", marginTop: spacing.md },
+  notice:        { gap: spacing.md },
+  noticeRow:     { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  noticeText:    { ...type.caption, color: colors.text, flex: 1 },
+  noticeButton:  { alignSelf: "flex-start" },
 
-  banner:       { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.dangerBg,
-                  borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
-  bannerText:   { ...type.caption, color: colors.danger, flex: 1 },
+  banner:        { flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.dangerBg },
+  bannerText:    { ...type.caption, color: colors.danger, flex: 1 },
 
-  warning:      { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, backgroundColor: colors.warningBg,
-                  borderRadius: radius.md, borderLeftWidth: 4, borderLeftColor: colors.warning, padding: spacing.md, marginBottom: spacing.md },
-  warningBody:  { flex: 1 },
-  warningTitle: { ...type.body, fontWeight: "700", color: colors.warningText },
-  warningText:  { ...type.caption, color: colors.warningText },
+  warning:       { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg,
+                   backgroundColor: colors.warningBg, borderWidth: 1, borderColor: colors.warning },
+  warningIcon:   { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: colors.warning },
+  warningBody:   { flex: 1 },
+  warningTitle:  { ...type.bodyLarge, fontWeight: "700", color: colors.warningText },
+  warningText:   { ...type.caption, color: colors.text },
 
-  todayCard:    { marginBottom: spacing.sm },
+  hero:          { borderRadius: radius.xl, padding: spacing.xl, overflow: "hidden", gap: spacing.md,
+                   borderWidth: 1, borderColor: colors.glassBorder },
+  heroSevere:    { borderColor: colors.warning },
   // Day name and date side by side on one baseline (not nested, so neither clips the other)
-  titleRow:     { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
-  todayTitle:   { ...type.title, fontWeight: "700", color: colors.text },
-  todaySub:     { ...type.caption, fontWeight: "400", color: colors.textSecondary },
-  todayMain:    { flexDirection: "row", alignItems: "center", gap: spacing.lg, marginTop: spacing.md },
-  todayInfo:    { flex: 1 },
-  todayTemp:    { ...type.display, fontWeight: "700", color: colors.text },
-  todayDesc:    { ...type.bodyLarge, color: colors.textSecondary },
+  titleRow:      { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
+  heroTitle:     { ...type.title, fontWeight: "700", color: colors.text },
+  heroSub:       { ...type.caption, color: colors.textSecondary },
+  heroMain:      { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroInfo:      { flex: 1 },
+  tempRow:       { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.sm },
+  heroTemp:      { ...type.display, fontWeight: "700", color: colors.text },
+  heroMin:       { ...type.title, fontWeight: "600", color: colors.textSecondary },
+  heroDesc:      { ...type.bodyLarge, color: colors.textSecondary },
 
-  dayCard:      { marginBottom: spacing.md },
-  dayTop:       { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  dayInfo:      { flex: 1 },
-  dayTitle:     { ...type.body, fontWeight: "700", color: colors.text },
-  daySub:       { ...type.caption, fontWeight: "400", color: colors.textSecondary },
-  dayDesc:      { ...type.caption, color: colors.textSecondary },
-  dayTemp:      { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  timeline:      { gap: spacing.md },
+  pills:         { gap: spacing.sm, paddingVertical: spacing.xs },
+  pill:          { width: 92, minHeight: 148, alignItems: "center", justifyContent: "space-between", gap: spacing.xs,
+                   paddingVertical: spacing.md, paddingHorizontal: spacing.sm, borderRadius: radius.lg,
+                   backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder },
+  pillActive:    { backgroundColor: colors.surfaceRaised, borderColor: colors.primary },
+  pillSevere:    { borderColor: colors.warning },
+  pillDay:       { ...type.caption, fontWeight: "600", color: colors.textSecondary, textAlign: "center" },
+  pillDayActive: { color: colors.text },
+  pillTemp:      { ...type.title, fontWeight: "700", color: colors.text },
+  pillRainRow:   { flexDirection: "row", alignItems: "center", gap: 2 },
+  pillRain:      { ...type.caption, fontWeight: "600", color: colors.textSecondary },
 
-  severeEdge:   { borderLeftWidth: 4, borderLeftColor: colors.warning },
-  severeText:   { color: colors.warningText, fontWeight: "700" },
+  detail:        { gap: spacing.md },
+  detailTitle:   { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  detailMain:    { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  detailInfo:    { flex: 1 },
+  detailDesc:    { ...type.body, color: colors.text },
+  detailTemp:    { ...type.bodyLarge, fontWeight: "700", color: colors.text },
 
-  stats:        { flexDirection: "row", gap: spacing.lg, marginTop: spacing.md, paddingTop: spacing.md,
-                  borderTopWidth: 1, borderTopColor: colors.divider },
-  stat:         { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  statLabel:    { ...type.caption, color: colors.textMuted },
-  statValue:    { ...type.body, fontWeight: "700", color: colors.text },
+  severeEdge:    { borderLeftWidth: 3, borderLeftColor: colors.warning },
+  severeText:    { color: colors.warningText, fontWeight: "700" },
+
+  stats:         { flexDirection: "row", gap: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider },
+  stat:          { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  statLabel:     { ...type.caption, color: colors.textSecondary },
+  statValue:     { ...type.body, fontWeight: "700", color: colors.text },
 });

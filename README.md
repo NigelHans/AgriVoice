@@ -49,9 +49,19 @@ Scan the QR code with the **Expo Go** app on your phone.
 cd backend
 python -m venv venv
 venv\Scripts\activate        # Windows
+source venv/bin/activate     # macOS / Linux
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+cp .env.example .env         # then fill in GROQ_API_KEY, SUPABASE_URL, SUPABASE_KEY
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Run the backend tests (Groq, Supabase and Open-Meteo are mocked — no credentials needed):
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+For the mobile app, copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_BACKEND_URL` to your computer's LAN IP.
 
 ---
 

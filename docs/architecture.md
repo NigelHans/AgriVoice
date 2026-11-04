@@ -45,7 +45,7 @@
 
 | Table             | Purpose                                         |
 |-------------------|-------------------------------------------------|
-| `market_prices`   | Daily crop prices synced from DA/BAI data       |
+| `market_prices`   | Monthly retail crop prices synced from UN-WFP (one row per crop/region/date) |
 | `conversations`   | Session records keyed by anonymous device ID    |
 | `messages`        | Individual turns (transcript + AI reply)        |
 | `crops_reference` | Static crop data with multilingual names        |
@@ -62,6 +62,6 @@
 | Code  | Language    | Whisper Code |
 |-------|-------------|--------------|
 | `fil` | Filipino    | `tl`         |
-| `ceb` | Cebuano     | `ceb`        |
+| `ceb` | Cebuano     | auto-detect (not in Whisper's language list) |
 | `ilo` | Ilocano     | auto-detect  |
 | `en`  | English     | `en`         |

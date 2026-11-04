@@ -1,34 +1,28 @@
 /**
- * LanguagePicker — A compact inline language selector shown on the VoiceScreen.
+ * LanguagePicker — language selector shown on the VoiceScreen, with full language names.
  */
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
-import { colors } from "../theme";
+import Chip from "./Chip";
+import { spacing } from "../theme";
 
 export default function LanguagePicker() {
   const { language, setLanguage } = useLanguage();
   return (
     <View style={styles.row}>
       {LANGUAGES.map((lang) => (
-        <TouchableOpacity
+        <Chip
           key={lang.code}
-          style={[styles.chip, language === lang.code && styles.active]}
+          label={lang.label}
+          selected={language === lang.code}
           onPress={() => setLanguage(lang.code)}
-        >
-          <Text style={[styles.chipText, language === lang.code && styles.activeText]}>
-            {lang.flag} {lang.code.toUpperCase()}
-          </Text>
-        </TouchableOpacity>
+        />
       ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row:       { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginBottom: 16, gap: 8 },
-  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary },
-  active:    { backgroundColor: colors.primary },
-  chipText:  { color: colors.primary, fontWeight: "600" },
-  activeText:{ color: colors.onPrimary },
+  row: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
 });

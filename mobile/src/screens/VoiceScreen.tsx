@@ -10,7 +10,7 @@
  * Without the microphone, the farmer can type the question instead. A recognised
  * transcript can be corrected and asked again; both go through /chat/ask.
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,19 +18,34 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  Easing,
   StyleSheet,
 } from "react-native";
 import { Audio } from "expo-av";
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { sendVoiceQuery, sendTextQuery } from "../services/api";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import { useLanguage } from "../context/LanguageContext";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import Badge from "../components/Badge";
 import { appendHistory } from "../services/historyStorage";
 import type { AssistantReply } from "../types";
-import { colors } from "../theme";
+import { colors, spacing, radius, cardShadow, type } from "../theme";
+
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+
+// Ready → Listening → Processing → Answer; the badge shown above the microphone
+const PHASES = {
+  ready:      { key: "voice.stateReady",      tone: "neutral", icon: "microphone-outline" },
+  listening:  { key: "voice.stateListening",  tone: "danger",  icon: "record-circle-outline" },
+  processing: { key: "voice.stateProcessing", tone: "warning", icon: "timer-sand" },
+  answer:     { key: "voice.stateAnswer",     tone: "success", icon: "check-circle-outline" },
+} as const;
 
 // Errors are stored as keys and translated when shown, so they follow a language change.
 // `typeInstead` adds the "type your question below" hint.
@@ -173,61 +188,111 @@ export default function VoiceScreen() {
     setIsEditing(true);
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.hint}>
-        {isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
-      </Text>
+  // Derived from the existing state; no new logic
+  const phase = isRecording ? "listening" : isLoading ? "processing" : reply ? "answer" : "ready";
+  const sendDisabled = isLoading || isRecording || !typedText.trim();
 
+  // Gentle pulsing ring around the microphone while listening
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isRecording) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.out(Easing.ease), useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isRecording, pulse]);
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <LanguagePicker />
 
-      <Text style={styles.regionText}>{t("voice.regionLine", { region: regionLabel })}</Text>
+      <View style={styles.regionRow}>
+        <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.accent} />
+        <Text style={styles.regionText}>{t("voice.regionLine", { region: regionLabel })}</Text>
+      </View>
 
-      <TouchableOpacity
-        style={[styles.micButton, isRecording && styles.micButtonActive]}
-        onPress={isRecording ? stopRecording : startRecording}
-        disabled={isLoading}
-      >
-        <Ionicons name={isRecording ? "stop" : "mic"} size={64} color={colors.onPrimary} />
-      </TouchableOpacity>
-
-      {isLoading && (
-        <>
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
-          <Text style={styles.loadingText}>{t("voice.loading")}</Text>
-        </>
-      )}
+      <View style={styles.micArea}>
+        <Badge label={t(PHASES[phase].key)} tone={PHASES[phase].tone} icon={PHASES[phase].icon} />
+        <View style={styles.micWrap}>
+          {isRecording && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                {
+                  opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.4] }) }],
+                },
+              ]}
+            />
+          )}
+          <TouchableOpacity
+            style={[styles.micButton, isRecording && styles.micButtonActive, isLoading && styles.micButtonBusy]}
+            onPress={isRecording ? stopRecording : startRecording}
+            disabled={isLoading}
+            accessibilityRole="button"
+            accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
+            accessibilityState={{ disabled: isLoading, busy: isLoading }}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="large" color={colors.onPrimary} />
+            ) : (
+              <MaterialCommunityIcons name={isRecording ? "stop" : "microphone"} size={72} color={colors.onPrimary} />
+            )}
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.hint} accessibilityLiveRegion="polite">
+          {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
+        </Text>
+      </View>
 
       {error && (
-        <View style={[styles.card, styles.errorCard]}>
-          <Text style={styles.errorText}>
-            {t(error.key, error.values)}
-            {error.typeInstead ? `\n${t("voice.typeInstead")}` : ""}
-          </Text>
-        </View>
+        <Card style={styles.errorCard}>
+          <View style={styles.errorRow}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={22} color={colors.danger} />
+            <Text style={styles.errorText}>
+              {t(error.key, error.values)}
+              {error.typeInstead ? `\n${t("voice.typeInstead")}` : ""}
+            </Text>
+          </View>
+        </Card>
       )}
 
       <View style={styles.typeRow}>
         <TextInput
           style={styles.input}
           placeholder={t("voice.typePlaceholder")}
+          placeholderTextColor={colors.textMuted}
           value={typedText}
           onChangeText={setTypedText}
           multiline
           editable={!isLoading}
+          accessibilityLabel={t("voice.typePlaceholder")}
         />
         <TouchableOpacity
-          style={[styles.sendButton, (isLoading || isRecording || !typedText.trim()) && styles.buttonDisabled]}
+          style={[styles.sendButton, sendDisabled && styles.buttonDisabled]}
           onPress={sendTyped}
-          disabled={isLoading || isRecording || !typedText.trim()}
+          disabled={sendDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t("voice.sendLabel")}
+          accessibilityState={{ disabled: sendDisabled }}
         >
-          <Ionicons name="send" size={20} color={colors.onPrimary} />
+          <MaterialCommunityIcons name="send" size={24} color={colors.onPrimary} />
         </TouchableOpacity>
       </View>
 
       {transcript !== "" && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>{t("voice.yourQuestion")}</Text>
+        <Card style={styles.card}>
+          <CardTitle icon="account-voice" text={t("voice.yourQuestion")} />
           {isEditing ? (
             <>
               <TextInput
@@ -237,76 +302,100 @@ export default function VoiceScreen() {
                 multiline
                 autoFocus
                 editable={!isLoading}
+                accessibilityLabel={t("voice.yourQuestion")}
               />
               <View style={styles.editActions}>
-                <TouchableOpacity onPress={() => setIsEditing(false)} disabled={isLoading}>
-                  <Text style={styles.linkMuted}>{t("voice.cancel")}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.askButton, (isLoading || !editedText.trim()) && styles.buttonDisabled]}
-                  onPress={askEdited}
-                  disabled={isLoading || !editedText.trim()}
-                >
-                  <Text style={styles.askButtonText}>{t("voice.askAgain")}</Text>
-                </TouchableOpacity>
+                <Button label={t("voice.cancel")} variant="text" onPress={() => setIsEditing(false)} disabled={isLoading} />
+                <Button label={t("voice.askAgain")} icon="send" onPress={askEdited} disabled={isLoading || !editedText.trim()} />
               </View>
             </>
           ) : (
             <>
-              <Text style={styles.cardText}>"{transcript}"</Text>
-              <TouchableOpacity style={styles.editLink} onPress={startEditing} disabled={isLoading}>
-                <Text style={styles.link}>{t("voice.edit")}</Text>
-              </TouchableOpacity>
+              <Text style={styles.questionText} selectable>"{transcript}"</Text>
+              <Button
+                label={t("voice.edit")}
+                variant="text"
+                icon="pencil-outline"
+                onPress={startEditing}
+                disabled={isLoading}
+                style={styles.editButton}
+              />
             </>
           )}
-        </View>
+        </Card>
       )}
 
-      {/* STEP 4: Render the structured layout results nicely if a reply exists */}
-      {reply && (
-        <View style={[styles.card, styles.replyCard]}>
-          {reply.mode === "negotiation" && (
-            <>
-              <Text style={styles.cardLabel}>{t("voice.analysisTitle", { region: regionLabel })}</Text>
-
-              <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>{t("voice.crop")}</Text>
-                <Text style={styles.dataValue}>{reply.extracted_data.crop ?? "—"}</Text>
-              </View>
-
-              <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>{t("voice.weight")}</Text>
-                <Text style={styles.dataValue}>{formatNumber(reply.extracted_data.weight, " kg")}</Text>
-              </View>
-
-              <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>{t("voice.offer")}</Text>
-                <Text style={styles.dataValueOffer}>{formatPeso(reply.extracted_data.offer_per_kg, " / kg")}</Text>
-              </View>
-
-              <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>{priceLabel(reply, t)}</Text>
-                <Text style={styles.dataValueFair}>{formatPeso(reply.fair_price_per_kg, " / kg")}</Text>
-              </View>
-
-              {reply.total_market_value !== null && (
-                <View style={styles.dataRow}>
-                  <Text style={styles.dataLabel}>{t("voice.totalValue")}</Text>
-                  <Text style={styles.totalValue}>₱{reply.total_market_value.toLocaleString()}</Text>
-                </View>
-              )}
-
-              <View style={styles.divider} />
-            </>
+      {reply && reply.mode === "negotiation" && (
+        <Card style={styles.card}>
+          <CardTitle icon="scale-balance" text={t("voice.analysisTitle", { region: regionLabel })} />
+          <DataRow label={t("voice.crop")} value={reply.extracted_data.crop ?? "—"} />
+          <DataRow label={t("voice.weight")} value={formatNumber(reply.extracted_data.weight, " kg")} />
+          <DataRow label={t("voice.offer")} value={formatPeso(reply.extracted_data.offer_per_kg, " / kg")} color={colors.danger} />
+          <DataRow label={priceLabel(reply, t)} value={formatPeso(reply.fair_price_per_kg, " / kg")} color={colors.primary} />
+          {reply.total_market_value !== null && (
+            <DataRow
+              label={t("voice.totalValue")}
+              value={`₱${reply.total_market_value.toLocaleString()}`}
+              color={colors.primary}
+              strong
+            />
           )}
+        </Card>
+      )}
 
-          <Text style={styles.cardLabel}>
-            {reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
-          </Text>
-          <Text style={styles.cardText}>{reply.strategy}</Text>
-        </View>
+      {reply && (
+        <Card style={[styles.card, styles.answerCard]}>
+          <CardTitle
+            icon="lightbulb-on-outline"
+            text={reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
+          />
+          <AnswerText text={reply.strategy} />
+        </Card>
       )}
     </ScrollView>
+  );
+}
+
+function CardTitle({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <View style={styles.cardTitleRow}>
+      <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
+      <Text style={styles.cardTitle} accessibilityRole="header">{text}</Text>
+    </View>
+  );
+}
+
+function DataRow({ label, value, color = colors.text, strong = false }: {
+  label: string; value: string; color?: string; strong?: boolean;
+}) {
+  return (
+    <View style={styles.dataRow}>
+      <Text style={styles.dataLabel}>{label}</Text>
+      <Text style={[styles.dataValue, { color }, strong && styles.dataValueStrong]}>{value}</Text>
+    </View>
+  );
+}
+
+// Shows the AI's answer exactly as returned. Only lines it starts with "•" are laid out as a
+// list (the bullet becomes a dot beside the text); no words are added, removed or reworded.
+function AnswerText({ text }: { text: string }) {
+  return (
+    <View>
+      {text.split("\n").map((line, i) => {
+        const bullet = /^\s*•\s?/.exec(line);
+        if (bullet) {
+          return (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.answerText} selectable>{line.slice(bullet[0].length)}</Text>
+            </View>
+          );
+        }
+        return line.trim() === ""
+          ? <View key={i} style={styles.paragraphGap} />
+          : <Text key={i} style={styles.answerText} selectable>{line}</Text>;
+      })}
+    </View>
   );
 }
 
@@ -334,38 +423,49 @@ function priceLabel(reply: AssistantReply, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, alignItems: "center", padding: 24, backgroundColor: colors.background },
-  hint: { fontSize: 16, color: colors.textSecondary, marginBottom: 16, textAlign: "center" },
-  regionText: { fontSize: 13, color: colors.textMuted, marginBottom: 20, textAlign: "center" },
-  loadingText: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: "center" },
-  micButton: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center", elevation: 8, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 8 },
+  screen:          { flex: 1, backgroundColor: colors.background },
+  container:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl },
+
+  regionRow:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, marginTop: spacing.md },
+  regionText:      { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
+
+  micArea:         { alignItems: "center", marginTop: spacing.xl, marginBottom: spacing.md, gap: spacing.md },
+  micWrap:         { width: 208, height: 208, alignItems: "center", justifyContent: "center" },
+  pulse:           { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: colors.danger },
+  micButton:       { width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primary,
+                     alignItems: "center", justifyContent: "center", ...cardShadow, elevation: 6 },
   micButtonActive: { backgroundColor: colors.danger },
-  card: { width: "100%", backgroundColor: colors.card, borderRadius: 12, padding: 16, marginTop: 20, elevation: 3 },
-  replyCard: { borderLeftWidth: 4, borderLeftColor: colors.primary },
-  cardLabel: { fontWeight: "bold", color: colors.primary, marginBottom: 6 },
-  cardText: { fontSize: 15, color: colors.text, lineHeight: 22 },
+  micButtonBusy:   { backgroundColor: colors.secondary },
+  hint:            { ...type.bodyLarge, fontWeight: "600", color: colors.text, textAlign: "center" },
 
-  // New formatting style lines for the data card dashboard display table:
-  dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  dataLabel: { fontSize: 14, color: colors.textSecondary },
-  dataValue: { fontSize: 14, fontWeight: "bold", color: colors.text },
-  dataValueOffer: { fontSize: 14, fontWeight: "bold", color: colors.danger },
-  dataValueFair: { fontSize: 14, fontWeight: "bold", color: colors.primary },
-  totalValue: { fontSize: 15, fontWeight: "bold", color: colors.primary },
-  divider: { height: 1, backgroundColor: colors.divider, marginVertical: 12 },
+  errorCard:       { marginTop: spacing.md, borderLeftWidth: 4, borderLeftColor: colors.danger },
+  errorRow:        { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  errorText:       { ...type.body, color: colors.danger, flex: 1 },
 
-  // Inline errors, text fallback and transcript editing
-  errorCard: { borderLeftWidth: 4, borderLeftColor: colors.danger },
-  errorText: { fontSize: 14, color: colors.danger, lineHeight: 20 },
-  typeRow: { width: "100%", flexDirection: "row", alignItems: "flex-end", marginTop: 20, gap: 8 },
-  input: { flex: 1, minHeight: 44, maxHeight: 120, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, fontSize: 15, color: colors.text },
-  editInput: { flex: 0, marginTop: 4 },
-  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
-  buttonDisabled: { opacity: 0.4 },
-  editLink: { alignSelf: "flex-end", marginTop: 8 },
-  link: { color: colors.primary, fontWeight: "600" },
-  linkMuted: { color: colors.textMuted, fontWeight: "600" },
-  editActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  askButton: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  askButtonText: { color: colors.onPrimary, fontWeight: "bold" },
+  typeRow:         { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm, marginTop: spacing.md },
+  input:           { flex: 1, minHeight: 52, maxHeight: 140, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                     borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+                     ...type.body, color: colors.text },
+  editInput:       { flex: 0, marginTop: spacing.xs },
+  sendButton:      { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  buttonDisabled:  { opacity: 0.45 },
+
+  card:            { marginTop: spacing.lg },
+  answerCard:      { borderLeftWidth: 4, borderLeftColor: colors.primary },
+  cardTitleRow:    { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
+  cardTitle:       { ...type.bodyLarge, fontWeight: "700", color: colors.primary, flex: 1 },
+  questionText:    { ...type.bodyLarge, color: colors.text },
+  editButton:      { alignSelf: "flex-end", marginTop: spacing.sm },
+  editActions:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.md },
+
+  dataRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md,
+                     paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  dataLabel:       { ...type.body, color: colors.textSecondary, flex: 1 },
+  dataValue:       { ...type.bodyLarge, fontWeight: "700", textAlign: "right" },
+  dataValueStrong: { ...type.title },
+
+  answerText:      { ...type.body, color: colors.text, flex: 1 },
+  bulletRow:       { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  bulletDot:       { ...type.body, fontWeight: "700", color: colors.primary },
+  paragraphGap:    { height: spacing.sm },
 });

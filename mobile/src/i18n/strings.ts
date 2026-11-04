@@ -167,6 +167,9 @@ const en = {
   "history.unknownTime": "Unknown time",
   "history.today": "Today, {time}",
   "history.yesterday": "Yesterday, {time}",
+  "history.groupToday": "Today",
+  "history.groupYesterday": "Yesterday",
+  "history.groupEarlier": "Earlier",
 
   // Settings screen
   "settings.languageTitle": "Language",
@@ -337,6 +340,9 @@ const fil: Dictionary = {
   "history.unknownTime": "Hindi alam ang oras",
   "history.today": "Ngayong araw, {time}",
   "history.yesterday": "Kahapon, {time}",
+  "history.groupToday": "Ngayong araw",
+  "history.groupYesterday": "Kahapon",
+  "history.groupEarlier": "Mas maaga",
 
   "settings.languageTitle": "Wika",
   "settings.languageHint": "Ginagamit sa app at sa mga sagot ng AI. Sa Cebuano at Ilocano, Filipino/English muna ang teksto ng app.",
@@ -505,6 +511,9 @@ const mixed: Dictionary = {
   "history.unknownTime": "Hindi alam ang oras",
   "history.today": "Ngayong araw, {time}",
   "history.yesterday": "Kahapon, {time}",
+  "history.groupToday": "Ngayong araw / Today",
+  "history.groupYesterday": "Kahapon / Yesterday",
+  "history.groupEarlier": "Mas maaga / Earlier",
 
   "settings.languageTitle": "Wika / Language",
   "settings.languageHint": "Sasagot ang AI sa napiling wika; Filipino/English muna ang teksto ng app. (AI answers use this language; app text stays Filipino/English for now.)",

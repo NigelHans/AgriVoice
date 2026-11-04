@@ -2,9 +2,8 @@
  * HistoryScreen — Shows past voice queries saved to AsyncStorage.
  * Each entry shows the transcript and AI reply; tapping one opens the full details.
  */
-import React, { useState, useCallback } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useCallback, useRef } from "react";
+import { View, Text, SectionList, StyleSheet, Alert, ScrollView } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { loadHistory, deleteHistoryEntry, clearHistory } from "../services/historyStorage";
 import { LANGUAGES } from "../context/LanguageContext";
@@ -12,10 +11,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useT, type StringKey, type Translate } from "../i18n";
 import type { HistoryEntry } from "../types";
 import StatusView from "../components/StatusView";
-import Card from "../components/Card";
+import Surface from "../components/Surface";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
-import { colors, spacing, radius, cardShadow, type } from "../theme";
+import BottomSheet from "../components/BottomSheet";
+import FadeInView from "../components/FadeInView";
+import PressableScale from "../components/PressableScale";
+import { colors, spacing, radius, type } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
 
@@ -104,6 +106,8 @@ export default function HistoryScreen() {
     );
   }
 
+  const sections = groupByDay([...history].reverse(), t);
+
   return (
     <View style={styles.container}>
       {history.length > 0 && (
@@ -112,31 +116,39 @@ export default function HistoryScreen() {
         </View>
       )}
       {actionError && !selected && <ActionError text={t(actionError)} />}
-      <FlatList
-        data={[...history].reverse()}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
         contentContainerStyle={history.length === 0 ? styles.emptyList : styles.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => { setActionError(null); setSelected(item); }}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.transcript || "—"}. ${t("history.view")}`}
-          >
-            <Meta entry={item} t={t} />
-            <View style={styles.line}>
-              <MaterialCommunityIcons name="account-voice" size={20} color={colors.primary} />
-              <Text style={styles.question} numberOfLines={2}>{item.transcript || "—"}</Text>
+        renderSectionHeader={({ section }) => <Text style={styles.groupTitle} accessibilityRole="header">{section.title}</Text>}
+        renderItem={({ item, index, section }) => (
+          <View style={styles.timelineRow}>
+            <View style={styles.rail}>
+              <View style={[styles.railLine, index === section.data.length - 1 && styles.railLineEnd]} />
+              <View style={styles.railDot} />
             </View>
-            <View style={styles.line}>
-              <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color={colors.secondary} />
-              <Text style={styles.answer} numberOfLines={2}>{item.reply || "—"}</Text>
-            </View>
-            <View style={styles.viewRow}>
-              <Text style={styles.viewText}>{t("history.view")}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
+            <FadeInView index={index} style={styles.cardWrap}>
+              <PressableScale
+                onPress={() => { setActionError(null); setSelected(item); }}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.transcript || "—"}. ${t("history.view")}`}
+              >
+                <Surface style={styles.card}>
+                  <Meta entry={item} t={t} />
+                  <Text style={styles.question} numberOfLines={2}>{item.transcript || "—"}</Text>
+                  <View style={styles.answerRow}>
+                    <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color={colors.secondary} />
+                    <Text style={styles.answer} numberOfLines={2}>{item.reply || "—"}</Text>
+                  </View>
+                  <View style={styles.viewRow}>
+                    <Text style={styles.viewText}>{t("history.view")}</Text>
+                    <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+                  </View>
+                </Surface>
+              </PressableScale>
+            </FadeInView>
+          </View>
         )}
         ListEmptyComponent={
           <StatusView
@@ -149,29 +161,69 @@ export default function HistoryScreen() {
         }
       />
 
-      <Modal visible={selected !== null} animationType="slide" onRequestClose={() => setSelected(null)}>
-        {selected && (
-          <SafeAreaView style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Button label={t("history.close")} variant="text" icon="chevron-left" onPress={() => setSelected(null)} />
-              <Button label={t("history.delete")} variant="danger" icon="delete-outline" onPress={() => confirmDelete(selected)} />
-            </View>
-            {actionError && <ActionError text={t(actionError)} />}
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <Meta entry={selected} t={t} />
-              <Card style={styles.detailCard}>
-                <DetailTitle icon="account-voice" text={t("voice.yourQuestion")} />
-                <Text style={styles.detailText} selectable>{selected.transcript || "—"}</Text>
-              </Card>
-              <Card style={[styles.detailCard, styles.replyCard]}>
-                <DetailTitle icon="lightbulb-on-outline" text={t("history.answer")} />
-                <Text style={styles.detailText} selectable>{selected.reply || "—"}</Text>
-              </Card>
-            </ScrollView>
-          </SafeAreaView>
-        )}
-      </Modal>
+      <DetailSheet
+        entry={selected}
+        onClose={() => setSelected(null)}
+        onDelete={confirmDelete}
+        actionError={actionError ? t(actionError) : null}
+        t={t}
+      />
     </View>
+  );
+}
+
+// Today / Yesterday / Earlier, keeping the newest-first order inside each group
+function groupByDay(entries: HistoryEntry[], t: Translate) {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = startOfDay(new Date());
+  const groups = [
+    { key: "today", title: t("history.groupToday"), data: [] as HistoryEntry[] },
+    { key: "yesterday", title: t("history.groupYesterday"), data: [] as HistoryEntry[] },
+    { key: "earlier", title: t("history.groupEarlier"), data: [] as HistoryEntry[] },
+  ];
+  for (const entry of entries) {
+    const date = new Date(entry.timestamp);
+    // Unknown dates go to "Earlier"; dates after today (clock changes) count as today
+    const daysAgo = isNaN(date.getTime()) ? Infinity : Math.round((today - startOfDay(date)) / 86_400_000);
+    groups[daysAgo <= 0 ? 0 : daysAgo === 1 ? 1 : 2].data.push(entry);
+  }
+  return groups.filter((g) => g.data.length > 0);
+}
+
+// The full question and answer in a bottom sheet. Keeps showing the last entry while the sheet slides away.
+function DetailSheet({ entry, onClose, onDelete, actionError, t }: {
+  entry: HistoryEntry | null;
+  onClose: () => void;
+  onDelete: (entry: HistoryEntry) => void;
+  actionError: string | null;
+  t: Translate;
+}) {
+  const last = useRef<HistoryEntry | null>(null);
+  if (entry) last.current = entry;
+  const shown = entry ?? last.current;
+  return (
+    <BottomSheet visible={entry !== null} onClose={onClose} closeLabel={t("history.close")}>
+      {shown && (
+        <>
+          <View style={styles.sheetHeader}>
+            <Button label={t("history.close")} variant="text" icon="chevron-down" onPress={onClose} />
+            <Button label={t("history.delete")} variant="danger" icon="delete-outline" onPress={() => onDelete(shown)} />
+          </View>
+          {actionError && <ActionError text={actionError} />}
+          <ScrollView contentContainerStyle={styles.sheetBody}>
+            <Meta entry={shown} t={t} />
+            <Surface variant="raised" style={styles.detailCard}>
+              <DetailTitle icon="account-voice" text={t("voice.yourQuestion")} />
+              <Text style={styles.detailText} selectable>{shown.transcript || "—"}</Text>
+            </Surface>
+            <Surface variant="raised" style={[styles.detailCard, styles.replyCard]}>
+              <DetailTitle icon="lightbulb-on-outline" text={t("history.answer")} />
+              <Text style={styles.detailText} selectable>{shown.reply || "—"}</Text>
+            </Surface>
+          </ScrollView>
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
@@ -180,7 +232,7 @@ function Meta({ entry, t }: { entry: HistoryEntry; t: Translate }) {
   return (
     <View style={styles.metaRow}>
       <View style={styles.timeRow}>
-        <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textMuted} />
+        <MaterialCommunityIcons name="clock-outline" size={16} color={colors.textSecondary} />
         <Text style={styles.time}>{formatTimestamp(entry.timestamp, t)}</Text>
       </View>
       {entry.language !== "" && <Badge label={languageLabel(entry.language)} icon="translate" />}
@@ -191,7 +243,7 @@ function Meta({ entry, t }: { entry: HistoryEntry; t: Translate }) {
 function DetailTitle({ icon, text }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; text: string }) {
   return (
     <View style={styles.detailTitleRow}>
-      <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
+      <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />
       <Text style={styles.detailTitle} accessibilityRole="header">{text}</Text>
     </View>
   );
@@ -227,15 +279,23 @@ const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: colors.background },
   toolbar:         { alignItems: "flex-end", paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   emptyList:       { flexGrow: 1 },
-  list:            { padding: spacing.lg, paddingTop: spacing.sm },
+  list:            { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  groupTitle:      { ...type.overline, color: colors.primary, marginTop: spacing.lg, marginBottom: spacing.sm, marginLeft: 28 },
 
-  card:            { backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md, ...cardShadow },
-  metaRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap",
-                     gap: spacing.sm, marginBottom: spacing.md },
+  // Timeline: a thin earth-brown rail with a clay dot beside each card
+  timelineRow:     { flexDirection: "row" },
+  rail:            { width: 28, alignItems: "center" },
+  railLine:        { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: colors.earth, opacity: 0.6 },
+  railLineEnd:     { bottom: "60%" },
+  railDot:         { marginTop: spacing.xl, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary,
+                     borderWidth: 2, borderColor: colors.background },
+  cardWrap:        { flex: 1, paddingBottom: spacing.md },
+  card:            { gap: spacing.sm },
+  metaRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
   timeRow:         { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  time:            { ...type.caption, color: colors.textMuted },
-  line:            { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, marginBottom: spacing.sm },
-  question:        { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
+  time:            { ...type.caption, color: colors.textSecondary },
+  question:        { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  answerRow:       { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   answer:          { ...type.body, color: colors.textSecondary, flex: 1 },
   viewRow:         { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", minHeight: 32 },
   viewText:        { ...type.body, fontWeight: "700", color: colors.primary },
@@ -244,13 +304,11 @@ const styles = StyleSheet.create({
                      padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
   actionErrorText: { ...type.caption, color: colors.danger, flex: 1 },
 
-  modal:           { flex: 1, backgroundColor: colors.background },
-  modalHeader:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.xs,
-                     paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.card },
-  modalBody:       { padding: spacing.lg },
-  detailCard:      { marginTop: spacing.md },
-  replyCard:       { borderLeftWidth: 4, borderLeftColor: colors.primary },
-  detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
-  detailTitle:     { ...type.bodyLarge, fontWeight: "700", color: colors.primary, flex: 1 },
+  sheetHeader:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.xs },
+  sheetBody:       { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
+  detailCard:      { gap: spacing.sm },
+  replyCard:       { borderLeftWidth: 3, borderLeftColor: colors.primary },
+  detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  detailTitle:     { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
   detailText:      { ...type.body, color: colors.text },
 });

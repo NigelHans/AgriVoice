@@ -24,6 +24,7 @@ export const colors = {
   glassBorder: "rgba(216, 208, 189, 0.12)",
   highlight: "rgba(216, 208, 189, 0.08)", // 1px top edge that gives cards depth
   sheen: "rgba(255, 255, 255, 0.25)",     // glossy top edge on solid clay / ember controls
+  scrim: "rgba(0, 0, 0, 0.55)",           // dims the screen behind sheets and overlays
 
   // Text
   text: "#D8D0BD",           // Natural Linen

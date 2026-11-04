@@ -190,3 +190,21 @@ def test_groq_outage_returns_502(client, fake_groq, fake_supabase):
 
 def test_empty_message_is_rejected(client):
     assert client.post("/api/v1/chat/ask", json={"message": ""}).status_code == 422
+
+
+def test_plain_text_strips_markdown_but_keeps_words_and_bullets():
+    from app.services.chat_service import plain_text
+    text = "## Mga hakbang\n• **Inspeksyon araw-araw** – tingnan ang dahon\n- Gamitin ang `neem oil`\n* Alisin ang __damo__"
+    assert plain_text(text) == ("Mga hakbang\n• Inspeksyon araw-araw – tingnan ang dahon\n"
+                                "• Gamitin ang neem oil\n• Alisin ang damo")
+    assert plain_text("₱60 * 100 kg = ₱6,000") == "₱60 * 100 kg = ₱6,000"   # a mid-line * is not a list
+
+
+def test_gpt_oss_models_get_low_reasoning_effort(client, fake_groq, fake_supabase, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "GROQ_LLM_MODEL", "openai/gpt-oss-120b")
+    groq_fake = fake_groq(chat_replies=[extraction(intent="general"), "**Use** compost."])
+    fake_supabase()
+    response = client.post("/api/v1/chat/ask", json={"message": "Soil tips?"})
+    assert response.json()["reply"] == "Use compost."
+    assert groq_fake.chat_calls[1]["reasoning_effort"] == "low"

@@ -17,7 +17,7 @@ import { colors, spacing, radius, type, fonts, themed } from "../theme";
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 // Product names, not translated
-const TECH = "Groq + Llama 3.3 70B + Whisper";
+const TECH = "Groq + GPT-OSS 120B + Whisper";
 
 export default function SettingsScreen() {
   const t = useT();

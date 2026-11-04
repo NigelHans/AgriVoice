@@ -7,6 +7,7 @@ Handles two kinds of farmer queries:
 """
 import json
 import logging
+import re
 from datetime import date
 from typing import Literal
 
@@ -87,8 +88,23 @@ def _language_name(language: str) -> str:
     return LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["fil"])
 
 
+REPLY_MAX_TOKENS = 1024   # gpt-oss counts its hidden reasoning against this; 512 cut answers off mid-sentence
+
+
+def plain_text(text: str) -> str:
+    """Remove Markdown the model adds despite PLAIN_TEXT_RULE: emphasis, headings, code marks;
+    "- " / "* " list markers become "• ", the one list format the app lays out."""
+    text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2), text)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+    text = re.sub(r"(?m)^(\s*)[-*]\s+", r"\1• ", text)
+    return text.replace("`", "")
+
+
 async def _complete(model: str, messages: list[dict], **kwargs) -> str:
     """Call Groq chat completions and return the text, raising ExternalServiceError on failure."""
+    if "gpt-oss" in model:
+        # Reasoning models think before answering; low effort keeps answers fast and within max_tokens
+        kwargs.setdefault("reasoning_effort", "low")
     try:
         response = await get_groq_client().chat.completions.create(model=model, messages=messages, **kwargs)
     except groq.GroqError as exc:
@@ -225,7 +241,7 @@ Keep it conversational, encouraging, and actionable.
     strategy = await _complete(
         settings.GROQ_LLM_MODEL,
         [{"role": "user", "content": prompt}],
-        max_tokens=512,
+        max_tokens=REPLY_MAX_TOKENS,
         temperature=0.4,
     )
 
@@ -238,7 +254,7 @@ Keep it conversational, encouraging, and actionable.
         price_region=price.region,
         price_date=price.price_date,
         price_source=price.source,
-        strategy=strategy,
+        strategy=plain_text(strategy),
     )
 
 
@@ -267,7 +283,7 @@ Reply in {_language_name(language)}.
     answer = await _complete(
         settings.GROQ_LLM_MODEL,
         [{"role": "system", "content": system_prompt}, *_clean_history(history), {"role": "user", "content": message}],
-        max_tokens=512,
+        max_tokens=REPLY_MAX_TOKENS,
         temperature=0.4,
     )
 
@@ -275,7 +291,7 @@ Reply in {_language_name(language)}.
         mode="advice",
         extracted_data=ExtractedData(crop=extraction.crop, weight=extraction.weight_kg, offer_per_kg=extraction.offer_per_kg),
         price_status="not_applicable",
-        strategy=answer,
+        strategy=plain_text(answer),
     )
 
 

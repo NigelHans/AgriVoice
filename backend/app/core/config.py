@@ -13,8 +13,9 @@ class Settings(BaseSettings):
     # Groq
     GROQ_API_KEY: str = ""
     GROQ_STT_MODEL: str = "whisper-large-v3"
-    GROQ_LLM_MODEL: str = "llama-3.3-70b-versatile"
-    GROQ_EXTRACTION_MODEL: str = "llama-3.1-8b-instant"
+    # The Llama models were retired on Groq (404 model_not_found, 2026-11-05)
+    GROQ_LLM_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_EXTRACTION_MODEL: str = "openai/gpt-oss-20b"
 
     # Supabase
     SUPABASE_URL: str = ""

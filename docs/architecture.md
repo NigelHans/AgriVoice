@@ -55,7 +55,7 @@
 | Task              | Model                    | Why                                          |
 |-------------------|--------------------------|----------------------------------------------|
 | Speech-to-Text    | `whisper-large-v3`       | Best OSS multilingual STT, free on Groq      |
-| AI Crop Advice    | `llama-3.3-70b-versatile`| Best OSS 70B chat model, fast on Groq        |
+| AI Crop Advice    | `openai/gpt-oss-120b`    | Groq's large open-weight chat model (Llama models retired) |
 
 ## Supported Languages
 

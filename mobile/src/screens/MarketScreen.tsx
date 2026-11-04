@@ -3,11 +3,13 @@
  * Data fetched from the FastAPI /market/prices endpoint (backed by Supabase).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, FlatList, TextInput, ActivityIndicator, StyleSheet, RefreshControl, TouchableOpacity } from "react-native";
+import { View, Text, FlatList, TextInput, StyleSheet, RefreshControl, TouchableOpacity } from "react-native";
 import { fetchMarketPrices } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import type { CropPrice } from "../types";
+import StatusView from "../components/StatusView";
+import { colors } from "../theme";
 
 type Scope = "mine" | "all";
 
@@ -69,35 +71,36 @@ export default function MarketScreen() {
     return query ? inScope.filter((p) => p.crop_name.toLowerCase().includes(query)) : inScope;
   }, [inScope, search]);
 
-  if (loading) return <ActivityIndicator size="large" color="#1a7a1a" style={{ flex: 1, marginTop: 40 }} />;
+  if (loading) return <StatusView loading />;
 
   // Nothing loaded yet and the request failed: full-screen error with retry
   if (error && prices.length === 0) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.errorTitle}>{t("market.loadFailedTitle")}</Text>
-        <Text style={styles.errorText}>{t("market.loadFailedText")}</Text>
-        <Text style={styles.errorDetail}>{t(error.key, error.values)}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={retry}>
-          <Text style={styles.retryText}>{t("common.retry")}</Text>
-        </TouchableOpacity>
-      </View>
+      <StatusView
+        tone="error"
+        icon="cloud-offline-outline"
+        title={t("market.loadFailedTitle")}
+        text={t("market.loadFailedText")}
+        detail={t(error.key, error.values)}
+        actionLabel={t("common.retry")}
+        onAction={retry}
+      />
     );
   }
 
   const emptyMessage = () => {
-    if (prices.length === 0) return <Text style={styles.empty}>{t("market.emptyDatabase")}</Text>;
+    if (prices.length === 0) return <StatusView icon="leaf-outline" title={t("market.emptyDatabase")} />;
     if (scope === "mine" && inScope.length === 0) {
       return (
-        <View style={styles.emptyBox}>
-          <Text style={styles.empty}>{t("market.noneInRegion")}</Text>
-          <TouchableOpacity style={[styles.retryBtn, styles.showAllBtn]} onPress={() => setScope("all")}>
-            <Text style={styles.retryText}>{t("market.showAllRegions")}</Text>
-          </TouchableOpacity>
-        </View>
+        <StatusView
+          icon="location-outline"
+          title={t("market.noneInRegion")}
+          actionLabel={t("market.showAllRegions")}
+          onAction={() => setScope("all")}
+        />
       );
     }
-    return <Text style={styles.empty}>{t("market.noMatch", { search: search.trim() })}</Text>;
+    return <StatusView icon="search-outline" title={t("market.noMatch", { search: search.trim() })} />;
   };
 
   return (
@@ -175,33 +178,24 @@ function formatPriceMonth(value: string): string | null {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f9f5" },
-  center:    { justifyContent: "center", alignItems: "center", padding: 24 },
-  search:    { margin: 12, marginBottom: 8, padding: 10, borderRadius: 8, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd" },
+  container: { flex: 1, backgroundColor: colors.background },
+  search:    { margin: 12, marginBottom: 8, padding: 10, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   scopeRow:  { flexDirection: "row", marginHorizontal: 12, gap: 8 },
-  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: "#1a7a1a" },
-  chipActive:{ backgroundColor: "#1a7a1a" },
-  chipText:  { color: "#1a7a1a", fontWeight: "600" },
-  chipTextActive: { color: "#fff" },
-  scopeCaption: { marginHorizontal: 12, marginTop: 6, fontSize: 12, color: "#888" },
-  row:       { backgroundColor: "#fff", marginHorizontal: 12, marginBottom: 8, padding: 14, borderRadius: 10, elevation: 2 },
+  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary },
+  chipActive:{ backgroundColor: colors.primary },
+  chipText:  { color: colors.primary, fontWeight: "600" },
+  chipTextActive: { color: colors.onPrimary },
+  scopeCaption: { marginHorizontal: 12, marginTop: 6, fontSize: 12, color: colors.textMuted },
+  row:       { backgroundColor: colors.card, marginHorizontal: 12, marginBottom: 8, padding: 14, borderRadius: 10, elevation: 2 },
   rowTop:    { flexDirection: "row", alignItems: "center" },
-  cropName:  { fontWeight: "bold", fontSize: 15, color: "#1a7a1a" },
-  region:    { fontSize: 12, color: "#888", marginTop: 2 },
-  price:     { fontWeight: "bold", fontSize: 17, color: "#333" },
-  details:   { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f0f0f0" },
-  detailText:{ fontSize: 12, color: "#888" },
-  legacyBadge: { alignSelf: "flex-start", fontSize: 12, fontWeight: "bold", color: "#a0522d", backgroundColor: "#fff3e0", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginBottom: 2, overflow: "hidden" },
-  empty:     { textAlign: "center", marginTop: 40, color: "#aaa" },
-  emptyBox:  { alignItems: "center" },
-  errorTitle:  { fontSize: 17, fontWeight: "bold", color: "#c0392b", marginBottom: 6, textAlign: "center" },
-  errorText:   { fontSize: 14, color: "#555", textAlign: "center", marginBottom: 6 },
-  errorDetail: { fontSize: 12, color: "#aaa", textAlign: "center", marginBottom: 16 },
-  retryBtn:    { backgroundColor: "#1a7a1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  showAllBtn:  { marginTop: 12 },
-  listContent: { paddingTop: 8, paddingBottom: 16 },
-  retryText:   { color: "#fff", fontWeight: "bold" },
-  banner:      { flexDirection: "row", alignItems: "center", backgroundColor: "#fdecea", marginHorizontal: 12, marginTop: 8, padding: 10, borderRadius: 8 },
-  bannerText:  { flex: 1, fontSize: 12, color: "#c0392b" },
-  bannerRetry: { color: "#1a7a1a", fontWeight: "bold", marginLeft: 8 },
+  cropName:  { fontWeight: "bold", fontSize: 15, color: colors.primary },
+  region:    { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  price:     { fontWeight: "bold", fontSize: 17, color: colors.text },
+  details:   { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.divider },
+  detailText:{ fontSize: 12, color: colors.textMuted },
+  legacyBadge: { alignSelf: "flex-start", fontSize: 12, fontWeight: "bold", color: colors.warningText, backgroundColor: colors.warningBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginBottom: 2, overflow: "hidden" },
+  listContent: { flexGrow: 1, paddingTop: 8, paddingBottom: 16 },
+  banner:      { flexDirection: "row", alignItems: "center", backgroundColor: colors.dangerBg, marginHorizontal: 12, marginTop: 8, padding: 10, borderRadius: 8 },
+  bannerText:  { flex: 1, fontSize: 12, color: colors.danger },
+  bannerRetry: { color: colors.primary, fontWeight: "bold", marginLeft: 8 },
 });

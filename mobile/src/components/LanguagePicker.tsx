@@ -4,6 +4,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
+import { colors } from "../theme";
 
 export default function LanguagePicker() {
   const { language, setLanguage } = useLanguage();
@@ -26,8 +27,8 @@ export default function LanguagePicker() {
 
 const styles = StyleSheet.create({
   row:       { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginBottom: 16, gap: 8 },
-  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: "#1a7a1a" },
-  active:    { backgroundColor: "#1a7a1a" },
-  chipText:  { color: "#1a7a1a", fontWeight: "600" },
-  activeText:{ color: "#fff" },
+  chip:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary },
+  active:    { backgroundColor: colors.primary },
+  chipText:  { color: colors.primary, fontWeight: "600" },
+  activeText:{ color: colors.onPrimary },
 });

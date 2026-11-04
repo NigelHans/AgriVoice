@@ -3,14 +3,15 @@
  * Each entry shows the transcript and AI reply; tapping one opens the full details.
  */
 import React, { useState, useCallback } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
 import { loadHistory, deleteHistoryEntry, clearHistory } from "../services/historyStorage";
 import { LANGUAGES } from "../context/LanguageContext";
 import { useT, type StringKey, type Translate } from "../i18n";
 import type { HistoryEntry } from "../types";
+import StatusView from "../components/StatusView";
+import { colors } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
 
@@ -81,22 +82,21 @@ export default function HistoryScreen() {
     ]);
   };
 
-  if (status === "loading") return <ActivityIndicator size="large" color="#1a7a1a" style={{ flex: 1, marginTop: 40 }} />;
+  if (status === "loading") return <StatusView loading />;
 
   if (status === "unreadable") {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Ionicons name="alert-circle-outline" size={56} color="#c0392b" />
-        <Text style={styles.errorTitle}>{t("history.unreadableTitle")}</Text>
-        <Text style={styles.emptyText}>{t("history.unreadableText")}</Text>
-        {actionError && <Text style={styles.actionError}>{t(actionError)}</Text>}
-        <TouchableOpacity style={styles.primaryBtn} onPress={load}>
-          <Text style={styles.primaryText}>{t("common.retry")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.clearAllLink} onPress={confirmClearAll}>
-          <Text style={styles.clearText}>{t("history.clearAndRestart")}</Text>
-        </TouchableOpacity>
-      </View>
+      <StatusView
+        tone="error"
+        icon="alert-circle-outline"
+        title={t("history.unreadableTitle")}
+        text={t("history.unreadableText")}
+        detail={actionError ? t(actionError) : undefined}
+        actionLabel={t("common.retry")}
+        onAction={load}
+        secondaryLabel={t("history.clearAndRestart")}
+        onSecondary={confirmClearAll}
+      />
     );
   }
 
@@ -111,6 +111,7 @@ export default function HistoryScreen() {
       <FlatList
         data={[...history].reverse()}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={history.length === 0 ? styles.emptyList : undefined}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => { setActionError(null); setSelected(item); }}>
             <View style={styles.metaRow}>
@@ -123,14 +124,13 @@ export default function HistoryScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons name="chatbubbles-outline" size={56} color="#b5cbb5" />
-            <Text style={styles.emptyTitle}>{t("history.emptyTitle")}</Text>
-            <Text style={styles.emptyText}>{t("history.emptyText")}</Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate("Voice" as never)}>
-              <Text style={styles.primaryText}>{t("history.askNow")}</Text>
-            </TouchableOpacity>
-          </View>
+          <StatusView
+            icon="chatbubbles-outline"
+            title={t("history.emptyTitle")}
+            text={t("history.emptyText")}
+            actionLabel={t("history.askNow")}
+            onAction={() => navigation.navigate("Voice" as never)}
+          />
         }
       />
 
@@ -185,31 +185,24 @@ function languageLabel(code: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f9f5", padding: 12 },
-  center:    { justifyContent: "center", alignItems: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: colors.background, padding: 12 },
+  emptyList: { flexGrow: 1 },
   clearBtn:  { alignSelf: "flex-end", marginBottom: 8 },
-  clearText: { color: "#c0392b", fontWeight: "bold" },
-  card:      { backgroundColor: "#fff", borderRadius: 10, padding: 14, marginBottom: 10, elevation: 2 },
+  clearText: { color: colors.danger, fontWeight: "bold" },
+  card:      { backgroundColor: colors.card, borderRadius: 10, padding: 14, marginBottom: 10, elevation: 2 },
   metaRow:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  time:      { fontSize: 11, color: "#aaa" },
-  lang:      { fontSize: 11, color: "#1a7a1a", fontWeight: "600" },
-  q:         { fontWeight: "bold", color: "#333", marginBottom: 4 },
-  a:         { color: "#555", lineHeight: 20 },
-  viewHint:  { alignSelf: "flex-end", marginTop: 6, fontSize: 12, color: "#1a7a1a", fontWeight: "600" },
-  emptyBox:  { alignItems: "center", marginTop: 60, paddingHorizontal: 24 },
-  emptyTitle:{ fontSize: 16, fontWeight: "bold", color: "#555", marginTop: 12, textAlign: "center" },
-  emptyText: { fontSize: 14, color: "#888", marginTop: 6, marginBottom: 16, textAlign: "center", lineHeight: 20 },
-  errorTitle:{ fontSize: 16, fontWeight: "bold", color: "#c0392b", marginTop: 12, textAlign: "center" },
-  actionError: { color: "#c0392b", fontSize: 13, textAlign: "center", marginBottom: 8, paddingHorizontal: 12 },
-  primaryBtn:  { backgroundColor: "#1a7a1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  primaryText: { color: "#fff", fontWeight: "bold" },
-  clearAllLink:{ marginTop: 16 },
-  modal:       { flex: 1, backgroundColor: "#f5f9f5" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#eaeaea", backgroundColor: "#fff" },
-  closeText:   { color: "#1a7a1a", fontWeight: "bold", fontSize: 15 },
+  time:      { fontSize: 11, color: colors.textFaint },
+  lang:      { fontSize: 11, color: colors.primary, fontWeight: "600" },
+  q:         { fontWeight: "bold", color: colors.text, marginBottom: 4 },
+  a:         { color: colors.textSecondary, lineHeight: 20 },
+  viewHint:  { alignSelf: "flex-end", marginTop: 6, fontSize: 12, color: colors.primary, fontWeight: "600" },
+  actionError: { color: colors.danger, fontSize: 13, textAlign: "center", marginBottom: 8, paddingHorizontal: 12 },
+  modal:       { flex: 1, backgroundColor: colors.background },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.divider, backgroundColor: colors.card },
+  closeText:   { color: colors.primary, fontWeight: "bold", fontSize: 15 },
   modalBody:   { padding: 16 },
-  detailCard:  { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginTop: 12, elevation: 2 },
-  replyCard:   { borderLeftWidth: 4, borderLeftColor: "#1a7a1a" },
-  detailLabel: { fontWeight: "bold", color: "#1a7a1a", marginBottom: 6 },
-  detailText:  { fontSize: 15, color: "#333", lineHeight: 22 },
+  detailCard:  { backgroundColor: colors.card, borderRadius: 12, padding: 16, marginTop: 12, elevation: 2 },
+  replyCard:   { borderLeftWidth: 4, borderLeftColor: colors.primary },
+  detailLabel: { fontWeight: "bold", color: colors.primary, marginBottom: 6 },
+  detailText:  { fontSize: 15, color: colors.text, lineHeight: 22 },
 });

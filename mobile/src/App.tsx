@@ -19,6 +19,7 @@ import MarketScreen from "./screens/MarketScreen";
 import WeatherScreen from "./screens/WeatherScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+import { colors } from "./theme";
 
 const Tab = createBottomTabNavigator();
 
@@ -52,11 +53,11 @@ function AppTabs() {
   return (
         <Tab.Navigator
           screenOptions={({ route }) => ({
-            headerStyle: { backgroundColor: "#1a7a1a" },
-            headerTintColor: "#fff",
+            headerStyle: { backgroundColor: colors.primary },
+            headerTintColor: colors.onPrimary,
             headerTitleStyle: { fontWeight: "bold" },
-            tabBarActiveTintColor: "#1a7a1a",
-            tabBarInactiveTintColor: "gray",
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.textMuted,
             tabBarIcon: ({ color, size }) => (
               <Ionicons
                 name={ICON_MAP[route.name]}

@@ -30,6 +30,7 @@ import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
 import { appendHistory } from "../services/historyStorage";
 import type { AssistantReply } from "../types";
+import { colors } from "../theme";
 
 // Errors are stored as keys and translated when shown, so they follow a language change.
 // `typeInstead` adds the "type your question below" hint.
@@ -187,12 +188,12 @@ export default function VoiceScreen() {
         onPress={isRecording ? stopRecording : startRecording}
         disabled={isLoading}
       >
-        <Ionicons name={isRecording ? "stop" : "mic"} size={64} color="#fff" />
+        <Ionicons name={isRecording ? "stop" : "mic"} size={64} color={colors.onPrimary} />
       </TouchableOpacity>
 
       {isLoading && (
         <>
-          <ActivityIndicator size="large" color="#1a7a1a" style={{ marginTop: 24 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
           <Text style={styles.loadingText}>{t("voice.loading")}</Text>
         </>
       )}
@@ -220,7 +221,7 @@ export default function VoiceScreen() {
           onPress={sendTyped}
           disabled={isLoading || isRecording || !typedText.trim()}
         >
-          <Ionicons name="send" size={20} color="#fff" />
+          <Ionicons name="send" size={20} color={colors.onPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -333,38 +334,38 @@ function priceLabel(reply: AssistantReply, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, alignItems: "center", padding: 24, backgroundColor: "#f5f9f5" },
-  hint: { fontSize: 16, color: "#555", marginBottom: 16, textAlign: "center" },
-  regionText: { fontSize: 13, color: "#888", marginBottom: 20, textAlign: "center" },
-  loadingText: { fontSize: 14, color: "#555", marginTop: 8, textAlign: "center" },
-  micButton: { width: 140, height: 140, borderRadius: 70, backgroundColor: "#1a7a1a", justifyContent: "center", alignItems: "center", elevation: 8, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8 },
-  micButtonActive: { backgroundColor: "#c0392b" },
-  card: { width: "100%", backgroundColor: "#fff", borderRadius: 12, padding: 16, marginTop: 20, elevation: 3 },
-  replyCard: { borderLeftWidth: 4, borderLeftColor: "#1a7a1a" },
-  cardLabel: { fontWeight: "bold", color: "#1a7a1a", marginBottom: 6 },
-  cardText: { fontSize: 15, color: "#333", lineHeight: 22 },
+  container: { flexGrow: 1, alignItems: "center", padding: 24, backgroundColor: colors.background },
+  hint: { fontSize: 16, color: colors.textSecondary, marginBottom: 16, textAlign: "center" },
+  regionText: { fontSize: 13, color: colors.textMuted, marginBottom: 20, textAlign: "center" },
+  loadingText: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: "center" },
+  micButton: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center", elevation: 8, shadowColor: colors.shadow, shadowOpacity: 0.25, shadowRadius: 8 },
+  micButtonActive: { backgroundColor: colors.danger },
+  card: { width: "100%", backgroundColor: colors.card, borderRadius: 12, padding: 16, marginTop: 20, elevation: 3 },
+  replyCard: { borderLeftWidth: 4, borderLeftColor: colors.primary },
+  cardLabel: { fontWeight: "bold", color: colors.primary, marginBottom: 6 },
+  cardText: { fontSize: 15, color: colors.text, lineHeight: 22 },
 
   // New formatting style lines for the data card dashboard display table:
   dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  dataLabel: { fontSize: 14, color: "#666" },
-  dataValue: { fontSize: 14, fontWeight: "bold", color: "#333" },
-  dataValueOffer: { fontSize: 14, fontWeight: "bold", color: "#c0392b" },
-  dataValueFair: { fontSize: 14, fontWeight: "bold", color: "#1a7a1a" },
-  totalValue: { fontSize: 15, fontWeight: "bold", color: "#1a7a1a" },
-  divider: { height: 1, backgroundColor: "#eaeaea", marginVertical: 12 },
+  dataLabel: { fontSize: 14, color: colors.textSecondary },
+  dataValue: { fontSize: 14, fontWeight: "bold", color: colors.text },
+  dataValueOffer: { fontSize: 14, fontWeight: "bold", color: colors.danger },
+  dataValueFair: { fontSize: 14, fontWeight: "bold", color: colors.primary },
+  totalValue: { fontSize: 15, fontWeight: "bold", color: colors.primary },
+  divider: { height: 1, backgroundColor: colors.divider, marginVertical: 12 },
 
   // Inline errors, text fallback and transcript editing
-  errorCard: { borderLeftWidth: 4, borderLeftColor: "#c0392b" },
-  errorText: { fontSize: 14, color: "#c0392b", lineHeight: 20 },
+  errorCard: { borderLeftWidth: 4, borderLeftColor: colors.danger },
+  errorText: { fontSize: 14, color: colors.danger, lineHeight: 20 },
   typeRow: { width: "100%", flexDirection: "row", alignItems: "flex-end", marginTop: 20, gap: 8 },
-  input: { flex: 1, minHeight: 44, maxHeight: 120, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", fontSize: 15, color: "#333" },
+  input: { flex: 1, minHeight: 44, maxHeight: 120, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, fontSize: 15, color: colors.text },
   editInput: { flex: 0, marginTop: 4 },
-  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#1a7a1a", justifyContent: "center", alignItems: "center" },
+  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
   buttonDisabled: { opacity: 0.4 },
   editLink: { alignSelf: "flex-end", marginTop: 8 },
-  link: { color: "#1a7a1a", fontWeight: "600" },
-  linkMuted: { color: "#888", fontWeight: "600" },
+  link: { color: colors.primary, fontWeight: "600" },
+  linkMuted: { color: colors.textMuted, fontWeight: "600" },
   editActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  askButton: { backgroundColor: "#1a7a1a", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  askButtonText: { color: "#fff", fontWeight: "bold" },
+  askButton: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  askButtonText: { color: colors.onPrimary, fontWeight: "bold" },
 });

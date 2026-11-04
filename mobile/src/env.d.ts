@@ -5,5 +5,6 @@
 declare const process: {
   env: {
     EXPO_PUBLIC_BACKEND_URL?: string;
+    EXPO_PUBLIC_USE_MOCKS?: string;
   };
 };

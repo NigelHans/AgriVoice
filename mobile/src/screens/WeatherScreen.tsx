@@ -4,12 +4,14 @@
  * When GPS is unavailable, it falls back to the centre of the region chosen in Settings.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, StyleSheet, TouchableOpacity, RefreshControl } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from "react-native";
 import * as Location from "expo-location";
 import { fetchWeather } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type StringKey, type Translate, type UiMessage } from "../i18n";
 import type { DailyForecast } from "../types";
+import StatusView from "../components/StatusView";
+import { colors } from "../theme";
 
 const GPS_TIMEOUT_MS = 15_000;
 const GEOCODE_TIMEOUT_MS = 5_000;
@@ -187,24 +189,20 @@ export default function WeatherScreen() {
 
   if (phase === "locating" || phase === "fetching") {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color="#1a7a1a" />
-        <Text style={styles.loadingText}>
-          {phase === "locating" ? t("weather.locating") : t("weather.fetching")}
-        </Text>
-      </View>
+      <StatusView loading text={phase === "locating" ? t("weather.locating") : t("weather.fetching")} />
     );
   }
 
   if (phase === "error" && error) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.errorTitle}>{t(error.title)}</Text>
-        <Text style={styles.errorText}>{t(error.message.key, error.message.values)}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => load()}>
-          <Text style={styles.retryText}>{t("common.retry")}</Text>
-        </TouchableOpacity>
-      </View>
+      <StatusView
+        tone="error"
+        icon="alert-circle-outline"
+        title={t(error.title)}
+        text={t(error.message.key, error.message.values)}
+        actionLabel={t("common.retry")}
+        onAction={() => load()}
+      />
     );
   }
 
@@ -363,34 +361,28 @@ function formatValue(value: number | null, unit: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f0f7ff" },
+  container: { flex: 1, backgroundColor: colors.background },
   content:   { padding: 12 },
-  center:    { justifyContent: "center", alignItems: "center", padding: 24 },
-  loadingText: { marginTop: 12, color: "#555", textAlign: "center" },
-  location:  { fontSize: 16, fontWeight: "bold", color: "#1a4a7a", marginBottom: 12 },
-  notice:    { backgroundColor: "#fff8e1", borderRadius: 10, padding: 12, marginBottom: 12 },
-  noticeText:{ fontSize: 13, color: "#6d5200", lineHeight: 19 },
-  noticeBtn: { alignSelf: "flex-start", marginTop: 8, backgroundColor: "#1a7a1a", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
-  noticeBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
-  banner:    { backgroundColor: "#fdecea", borderRadius: 8, padding: 10, marginBottom: 12 },
-  bannerText:{ fontSize: 12, color: "#c0392b" },
-  card:      { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
-  cardSevere:{ borderLeftWidth: 4, borderLeftColor: "#e67e22" },
+  location:  { fontSize: 16, fontWeight: "bold", color: colors.primary, marginBottom: 12 },
+  notice:    { backgroundColor: colors.noticeBg, borderRadius: 10, padding: 12, marginBottom: 12 },
+  noticeText:{ fontSize: 13, color: colors.notice, lineHeight: 19 },
+  noticeBtn: { alignSelf: "flex-start", marginTop: 8, backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+  noticeBtnText: { color: colors.onPrimary, fontWeight: "bold", fontSize: 13 },
+  banner:    { backgroundColor: colors.dangerBg, borderRadius: 8, padding: 10, marginBottom: 12 },
+  bannerText:{ fontSize: 12, color: colors.danger },
+  card:      { backgroundColor: colors.card, borderRadius: 12, padding: 14, marginBottom: 10, elevation: 2 },
+  cardSevere:{ borderLeftWidth: 4, borderLeftColor: colors.warning },
   cardTop:   { flexDirection: "row", alignItems: "center" },
   icon:      { fontSize: 32, marginRight: 12 },
-  date:      { fontWeight: "bold", color: "#333" },
-  dateSub:   { fontWeight: "normal", color: "#888", fontSize: 12 },
-  description: { color: "#555", marginTop: 2 },
-  descriptionSevere: { color: "#c0562b", fontWeight: "bold" },
-  stats:     { flexDirection: "row", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#eef2f7" },
+  date:      { fontWeight: "bold", color: colors.text },
+  dateSub:   { fontWeight: "normal", color: colors.textMuted, fontSize: 12 },
+  description: { color: colors.textSecondary, marginTop: 2 },
+  descriptionSevere: { color: colors.warningText, fontWeight: "bold" },
+  stats:     { flexDirection: "row", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.divider },
   stat:      { flex: 1 },
-  statLabel: { fontSize: 11, color: "#888", marginBottom: 2 },
-  temp:      { color: "#333", fontWeight: "bold" },
-  rain:      { color: "#1a4a7a", fontWeight: "bold" },
-  wind:      { color: "#555", fontWeight: "bold" },
-  empty:     { textAlign: "center", marginTop: 40, color: "#aaa" },
-  errorTitle:{ fontSize: 17, fontWeight: "bold", color: "#c0392b", marginBottom: 6, textAlign: "center" },
-  errorText: { fontSize: 14, color: "#555", textAlign: "center", marginBottom: 16 },
-  retryBtn:  { backgroundColor: "#1a7a1a", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  retryText: { color: "#fff", fontWeight: "bold" },
+  statLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
+  temp:      { color: colors.text, fontWeight: "bold" },
+  rain:      { color: colors.primary, fontWeight: "bold" },
+  wind:      { color: colors.textSecondary, fontWeight: "bold" },
+  empty:     { textAlign: "center", marginTop: 40, color: colors.textFaint },
 });

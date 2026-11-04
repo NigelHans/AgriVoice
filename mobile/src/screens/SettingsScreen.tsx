@@ -6,6 +6,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-nati
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
 import { useRegion, REGIONS } from "../context/RegionContext";
 import { useT } from "../i18n";
+import { colors } from "../theme";
 
 // Product names, not translated
 const TECH = "Groq + Llama 3.3 70B + Whisper";
@@ -60,16 +61,16 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: "#f5f9f5" },
+  container:    { flex: 1, backgroundColor: colors.background },
   content:      { padding: 20, paddingBottom: 32 },
-  sectionTitle: { fontSize: 14, fontWeight: "bold", color: "#888", marginTop: 24, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 },
-  sectionHint:  { fontSize: 13, color: "#888", marginTop: -4, marginBottom: 10, lineHeight: 18 },
-  option:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, padding: 16, marginBottom: 8, elevation: 1 },
-  selected:     { backgroundColor: "#1a7a1a" },
-  optionText:   { fontSize: 16, color: "#333" },
+  sectionTitle: { fontSize: 14, fontWeight: "bold", color: colors.textMuted, marginTop: 24, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 },
+  sectionHint:  { fontSize: 13, color: colors.textMuted, marginTop: -4, marginBottom: 10, lineHeight: 18 },
+  option:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: colors.card, borderRadius: 10, padding: 16, marginBottom: 8, elevation: 1 },
+  selected:     { backgroundColor: colors.primary },
+  optionText:   { fontSize: 16, color: colors.text },
   regionOptionText: { flex: 1, fontSize: 15 },
-  selectedText: { color: "#fff", fontWeight: "bold" },
-  check:        { color: "#fff", fontWeight: "bold", fontSize: 18 },
-  about:        { backgroundColor: "#fff", borderRadius: 10, padding: 16, elevation: 1 },
-  aboutText:    { color: "#555", marginBottom: 4 },
+  selectedText: { color: colors.onPrimary, fontWeight: "bold" },
+  check:        { color: colors.onPrimary, fontWeight: "bold", fontSize: 18 },
+  about:        { backgroundColor: colors.card, borderRadius: 10, padding: 16, elevation: 1 },
+  aboutText:    { color: colors.textSecondary, marginBottom: 4 },
 });

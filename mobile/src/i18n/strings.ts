@@ -78,7 +78,6 @@ const en = {
   "market.noMatch": "No crops match \"{search}\".",
   "market.scopeMine": "My region",
   "market.scopeAll": "All regions",
-  "market.showingRegion": "Showing prices for {region}",
   "market.noneInRegion": "No prices for your region yet.",
   "market.showAllRegions": "Show all regions",
   "market.priceDate": "Price date: {date}",
@@ -88,6 +87,9 @@ const en = {
   "market.sectionOlder": "Older reference prices",
   "market.sectionOlderHint": "Not verified, and the report date is unknown. Use only as a rough guide.",
   "market.verifiedBadge": "Verified",
+  "market.summaryRegion": "Your region",
+  "market.summaryCrops": "Crops",
+  "market.summaryLatest": "Latest price",
 
   // Weather screen
   "weather.locating": "Finding your location…",
@@ -248,7 +250,6 @@ const fil: Dictionary = {
   "market.noMatch": "Walang pananim na tugma sa \"{search}\".",
   "market.scopeMine": "Aking rehiyon",
   "market.scopeAll": "Lahat ng rehiyon",
-  "market.showingRegion": "Ipinapakita ang presyo sa {region}",
   "market.noneInRegion": "Wala pang presyo para sa iyong rehiyon.",
   "market.showAllRegions": "Ipakita ang lahat ng rehiyon",
   "market.priceDate": "Petsa ng presyo: {date}",
@@ -258,6 +259,9 @@ const fil: Dictionary = {
   "market.sectionOlder": "Lumang presyo (sanggunian lang)",
   "market.sectionOlderHint": "Hindi beripikado at hindi alam ang petsa ng ulat. Gamitin lang bilang gabay.",
   "market.verifiedBadge": "Beripikado",
+  "market.summaryRegion": "Iyong rehiyon",
+  "market.summaryCrops": "Mga pananim",
+  "market.summaryLatest": "Pinakabagong presyo",
 
   "weather.locating": "Hinahanap ang iyong lokasyon…",
   "weather.fetching": "Kinukuha ang taya ng panahon…",
@@ -414,7 +418,6 @@ const mixed: Dictionary = {
   "market.noMatch": "Walang pananim na tugma sa \"{search}\".",
   "market.scopeMine": "Aking rehiyon / My region",
   "market.scopeAll": "Lahat ng rehiyon / All regions",
-  "market.showingRegion": "Ipinapakita / Showing: {region}",
   "market.noneInRegion": "Wala pang presyo para sa iyong rehiyon. (No prices for your region yet.)",
   "market.showAllRegions": "Ipakita ang lahat / Show all regions",
   "market.priceDate": "Petsa ng presyo / Price date: {date}",
@@ -424,6 +427,9 @@ const mixed: Dictionary = {
   "market.sectionOlder": "Lumang presyo / Older reference prices",
   "market.sectionOlderHint": "Hindi beripikado at hindi alam ang petsa. (Not verified; report date unknown. Use only as a rough guide.)",
   "market.verifiedBadge": "Beripikado / Verified",
+  "market.summaryRegion": "Iyong rehiyon / Your region",
+  "market.summaryCrops": "Mga pananim / Crops",
+  "market.summaryLatest": "Pinakabagong presyo / Latest price",
 
   "weather.locating": "Hinahanap ang iyong lokasyon… (Finding your location…)",
   "weather.fetching": "Kinukuha ang taya ng panahon… (Loading the forecast…)",

@@ -3,17 +3,22 @@
  * Data fetched from the FastAPI /market/prices endpoint (backed by Supabase).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, SectionList, TextInput, StyleSheet, RefreshControl } from "react-native";
+import { View, Text, ScrollView, TextInput, StyleSheet, RefreshControl } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { fetchMarketPrices } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import type { CropPrice } from "../types";
 import StatusView from "../components/StatusView";
-import Card from "../components/Card";
+import Surface from "../components/Surface";
 import Chip from "../components/Chip";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
+import BentoTile from "../components/BentoTile";
+import FadeInView from "../components/FadeInView";
+import GradientFill from "../components/GradientFill";
+import PressableScale from "../components/PressableScale";
 import SectionHeader from "../components/SectionHeader";
 import { colors, spacing, radius, type } from "../theme";
 
@@ -109,16 +114,28 @@ export default function MarketScreen() {
     return <StatusView icon="search-outline" title={t("market.noMatch", { search: search.trim() })} />;
   };
 
-  // Verified prices first; pre-migration (legacy) rows separately, so old data never looks current.
-  // Empty sections are left out, so the empty-state message shows when nothing matches.
-  const sections = [
-    { key: "verified", title: t("market.sectionVerified"), hint: undefined, data: visible.filter((p) => !p.is_legacy) },
-    { key: "older", title: t("market.sectionOlder"), hint: t("market.sectionOlderHint"), data: visible.filter((p) => p.is_legacy) },
-  ].filter((s) => s.data.length > 0);
+  // Verified prices first; pre-migration (legacy) rows separately, so old data never looks current
+  const verified = visible.filter((p) => !p.is_legacy);
+  const older = visible.filter((p) => p.is_legacy);
+  const [featured, ...restVerified] = verified;
 
+  // Summary tiles use only the loaded prices for the chosen scope (search narrows the list, not the summary)
+  const cropCount = new Set(inScope.map((p) => p.crop_name)).size;
+  const latestVerified = inScope.filter((p) => !p.is_legacy).map((p) => p.price_date).sort().pop();
+  const latestLabel = (latestVerified && formatPriceMonth(latestVerified)) || "—";
+
+  // shortcut: a plain ScrollView renders every tile; fine for the latest price per crop and region
+  // (tens of rows). Switch back to a virtualized list if the endpoint ever returns full history.
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBox}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />
+      }
+    >
+      <Surface variant="glass" style={styles.searchBox}>
         <MaterialCommunityIcons name="magnify" size={22} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
@@ -128,63 +145,126 @@ export default function MarketScreen() {
           onChangeText={setSearch}
           accessibilityLabel={t("market.searchPlaceholder")}
         />
-      </View>
+      </Surface>
 
       <View style={styles.scopeRow}>
         <Chip label={t("market.scopeMine")} icon="map-marker-outline" selected={scope === "mine"} onPress={() => setScope("mine")} />
         <Chip label={t("market.scopeAll")} icon="earth" selected={scope === "all"} onPress={() => setScope("all")} />
       </View>
-      {scope === "mine" && (
-        <View style={styles.captionRow}>
-          <MaterialCommunityIcons name="map-marker" size={16} color={colors.accent} />
-          <Text style={styles.scopeCaption}>{t("market.showingRegion", { region: getRegionLabel(region) })}</Text>
-        </View>
-      )}
 
       {error && (
-        <View style={styles.banner}>
+        <Surface style={styles.banner}>
           <MaterialCommunityIcons name="wifi-off" size={20} color={colors.danger} />
           <Text style={styles.bannerText}>{t("market.refreshFailed")}</Text>
           <Button label={t("common.retryShort")} variant="text" onPress={refresh} disabled={refreshing} />
-        </View>
+        </Surface>
       )}
 
-      <SectionList
-        sections={sections}
-        contentContainerStyle={styles.listContent}
-        stickySectionHeadersEnabled={false}
-        // crop_name + region is unique in the response; id can be null
-        keyExtractor={(item) => `${item.crop_name}|${item.region}`}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />
-        }
-        renderSectionHeader={({ section }) => <SectionHeader title={section.title} hint={section.hint} />}
-        renderItem={({ item }) => <PriceCard item={item} t={t} />}
-        ListEmptyComponent={emptyMessage()}
-      />
+      {prices.length > 0 && (
+        <FadeInView style={styles.bento}>
+          <RegionTile label={t("market.summaryRegion")} value={scope === "mine" ? getRegionLabel(region) : t("market.scopeAll")} t={t} />
+          <View style={styles.bentoRow}>
+            <BentoTile label={t("market.summaryCrops")} value={String(cropCount)} icon="sprout" />
+            <BentoTile label={t("market.summaryLatest")} value={latestLabel} icon="calendar-month-outline" valueColor={colors.primary} />
+          </View>
+        </FadeInView>
+      )}
+
+      {visible.length === 0 ? (
+        emptyMessage()
+      ) : (
+        <>
+          {featured && (
+            <>
+              <SectionHeader title={`${t("market.sectionVerified")} · ${verified.length}`} />
+              <FadeInView index={1}>
+                <FeaturedPrice item={featured} t={t} />
+              </FadeInView>
+              <View style={styles.grid}>
+                {restVerified.map((item, i) => (
+                  <FadeInView key={`${item.crop_name}|${item.region}`} index={i + 2} style={styles.gridCell}>
+                    <PriceTile item={item} t={t} />
+                  </FadeInView>
+                ))}
+              </View>
+            </>
+          )}
+          {older.length > 0 && (
+            <>
+              <SectionHeader title={`${t("market.sectionOlder")} · ${older.length}`} hint={t("market.sectionOlderHint")} />
+              {older.map((item, i) => (
+                <FadeInView key={`${item.crop_name}|${item.region}`} index={i} style={styles.olderCell}>
+                  <PriceTile item={item} t={t} />
+                </FadeInView>
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+// The region the summary is for; tapping opens Settings, where the region is chosen
+function RegionTile({ label, value, t }: { label: string; value: string; t: Translate }) {
+  const navigation = useNavigation();
+  return (
+    <PressableScale
+      onPress={() => navigation.navigate("Settings" as never)}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}. ${t("settings.regionChange")}`}
+    >
+      <Surface variant="raised" style={styles.regionTile}>
+        <MaterialCommunityIcons name="map-marker" size={24} color={colors.primary} />
+        <View style={styles.regionInfo}>
+          <Text style={styles.overline}>{label}</Text>
+          <Text style={styles.regionValue} numberOfLines={2}>{value}</Text>
+        </View>
+        <Text style={styles.changeText}>{t("settings.regionChange")}</Text>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
+      </Surface>
+    </PressableScale>
+  );
+}
+
+// The first verified price, large, on a soft gradient
+function FeaturedPrice({ item, t }: { item: CropPrice; t: Translate }) {
+  return (
+    <View style={styles.featured}>
+      <GradientFill from={colors.surfaceRaised} to={colors.card} />
+      <View style={styles.featuredTop}>
+        <View style={styles.cropIconLarge}>
+          <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={30} color={colors.primary} />
+        </View>
+        <View style={styles.featuredInfo}>
+          <Text style={styles.featuredCrop}>{item.crop_name}</Text>
+          <Text style={styles.region}>{getRegionLabel(item.region)}</Text>
+        </View>
+      </View>
+      <Text style={styles.featuredPrice} accessibilityLabel={`₱${item.price_per_kg.toFixed(2)} / ${item.unit?.trim() || "kg"}`}>
+        ₱{item.price_per_kg.toFixed(2)}
+        <Text style={styles.featuredUnit}>  / {item.unit?.trim() || "kg"}</Text>
+      </Text>
+      <PriceDetails item={item} t={t} />
     </View>
   );
 }
 
-// Crop name and price per kilogram first; then region, verification, date and source
-function PriceCard({ item, t }: { item: CropPrice; t: Translate }) {
+// A compact price tile: crop and price per kilogram first; region, verification, date and source below
+function PriceTile({ item, t }: { item: CropPrice; t: Translate }) {
   return (
-    <Card style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={styles.cropIcon}>
-          <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={26} color={colors.primary} />
-        </View>
-        <View style={styles.cropInfo}>
-          <Text style={styles.cropName}>{item.crop_name}</Text>
-          <Text style={styles.region}>{getRegionLabel(item.region)}</Text>
-        </View>
-        <View style={styles.priceBox}>
-          <Text style={[styles.price, item.is_legacy && styles.priceLegacy]}>₱{item.price_per_kg.toFixed(2)}</Text>
-          <Text style={styles.unit}>/ {item.unit?.trim() || "kg"}</Text>
-        </View>
+    <Surface variant={item.is_legacy ? "glass" : "base"} style={styles.tile}>
+      <View style={styles.tileTop}>
+        <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={22} color={item.is_legacy ? colors.textSecondary : colors.primary} />
+        <Text style={styles.tileCrop} numberOfLines={1}>{item.crop_name}</Text>
       </View>
+      <Text style={[styles.tilePrice, item.is_legacy && styles.priceLegacy]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        ₱{item.price_per_kg.toFixed(2)}
+        <Text style={styles.tileUnit}> / {item.unit?.trim() || "kg"}</Text>
+      </Text>
+      <Text style={styles.region} numberOfLines={2}>{getRegionLabel(item.region)}</Text>
       <PriceDetails item={item} t={t} />
-    </Card>
+    </Surface>
   );
 }
 
@@ -199,12 +279,10 @@ function PriceDetails({ item, t }: { item: CropPrice; t: Translate }) {
       {item.is_legacy ? (
         <Badge label={t("market.legacyBadge")} tone="warning" icon="alert-outline" />
       ) : (
-        <View style={styles.detailRow}>
-          <Badge label={t("market.verifiedBadge")} tone="success" icon="check-decagram-outline" />
-          {date && <Text style={styles.detailText}>{t("market.priceDate", { date })}</Text>}
-        </View>
+        <Badge label={t("market.verifiedBadge")} tone="success" icon="check-decagram-outline" />
       )}
-      {source ? <Text style={styles.detailText}>{t("market.source", { source })}</Text> : null}
+      {date && <Text style={styles.detailText}>{t("market.priceDate", { date })}</Text>}
+      {source ? <Text style={styles.detailText} numberOfLines={2}>{t("market.source", { source })}</Text> : null}
     </View>
   );
 }
@@ -226,29 +304,43 @@ function formatPriceMonth(value: string): string | null {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  searchBox:    { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.lg,
-                  paddingHorizontal: spacing.md, minHeight: 52, borderRadius: radius.md, backgroundColor: colors.card,
-                  borderWidth: 1, borderColor: colors.border },
-  searchInput:  { flex: 1, ...type.body, color: colors.text, paddingVertical: spacing.sm },
-  scopeRow:     { flexDirection: "row", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.md },
-  captionRow:   { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginHorizontal: spacing.lg, marginTop: spacing.sm },
-  scopeCaption: { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
-  banner:       { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.md,
-                  paddingLeft: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
-  bannerText:   { flex: 1, ...type.caption, color: colors.danger },
-  listContent:  { flexGrow: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  card:         { marginBottom: spacing.md },
-  cardTop:      { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  cropIcon:     { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: colors.successBg },
-  cropInfo:     { flex: 1 },
-  cropName:     { ...type.title, fontWeight: "700", color: colors.text },
-  region:       { ...type.caption, color: colors.textSecondary },
-  priceBox:     { alignItems: "flex-end" },
-  price:        { ...type.headline, fontWeight: "700", color: colors.primary },
-  priceLegacy:  { color: colors.textSecondary },
-  unit:         { ...type.caption, color: colors.textSecondary },
-  details:      { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider, gap: spacing.xs },
-  detailRow:    { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
-  detailText:   { ...type.caption, color: colors.accent },
+  container:     { flex: 1, backgroundColor: colors.background },
+  content:       { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+
+  searchBox:     { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: 0, paddingHorizontal: spacing.md,
+                   minHeight: 52, borderRadius: radius.xl },
+  searchInput:   { flex: 1, ...type.body, color: colors.text, paddingVertical: spacing.sm },
+  scopeRow:      { flexDirection: "row", gap: spacing.sm },
+  banner:        { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs, backgroundColor: colors.dangerBg },
+  bannerText:    { flex: 1, ...type.caption, color: colors.danger },
+
+  bento:         { gap: spacing.md },
+  bentoRow:      { flexDirection: "row", gap: spacing.md },
+  regionTile:    { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  regionInfo:    { flex: 1 },
+  overline:      { ...type.overline, color: colors.textSecondary },
+  regionValue:   { ...type.bodyLarge, fontWeight: "700", color: colors.text },
+  changeText:    { ...type.body, fontWeight: "700", color: colors.primary },
+
+  featured:      { borderRadius: radius.xl, padding: spacing.xl, overflow: "hidden", gap: spacing.md,
+                   borderWidth: 1, borderColor: colors.glassBorder },
+  featuredTop:   { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  cropIconLarge: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  featuredInfo:  { flex: 1 },
+  featuredCrop:  { ...type.headline, fontWeight: "700", color: colors.text },
+  featuredPrice: { ...type.display, fontWeight: "700", color: colors.primary },
+  featuredUnit:  { ...type.body, fontWeight: "600", color: colors.textSecondary, letterSpacing: 0 },
+
+  grid:          { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  gridCell:      { width: "47.5%", flexGrow: 1 },
+  olderCell:     { width: "100%" },
+  tile:          { flex: 1, gap: spacing.sm },
+  tileTop:       { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  tileCrop:      { ...type.bodyLarge, fontWeight: "700", color: colors.text, flex: 1 },
+  tilePrice:     { ...type.headline, fontSize: 26, fontWeight: "700", color: colors.primary },
+  tileUnit:      { ...type.caption, fontWeight: "600", color: colors.textSecondary, letterSpacing: 0 },
+  priceLegacy:   { color: colors.textSecondary },
+  region:        { ...type.caption, color: colors.textSecondary },
+  details:       { gap: spacing.xs, marginTop: spacing.xs },
+  detailText:    { ...type.caption, color: colors.accent },
 });

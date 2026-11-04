@@ -1,15 +1,15 @@
 /**
- * SettingsScreen — Language and region selection and app preferences.
+ * SettingsScreen — plain grouped rows: language and region (each opens a sheet), Day or Night display,
+ * how weather finds your location, and about.
  */
 import React, { useState } from "react";
 import { View, Text, ScrollView, FlatList, TextInput, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLanguage, LANGUAGES } from "../context/LanguageContext";
 import { useRegion, REGIONS, getRegionLabel } from "../context/RegionContext";
+import { useThemeMode } from "../context/ThemeContext";
 import { useT } from "../i18n";
-import Surface from "../components/Surface";
 import BottomSheet from "../components/BottomSheet";
-import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
 import StatusView from "../components/StatusView";
 import { colors, spacing, radius, type, fonts, themed } from "../theme";
@@ -38,48 +38,48 @@ export default function SettingsScreen() {
   };
 
   const [languageOpen, setLanguageOpen] = useState(false);
+  const { mode, setMode } = useThemeMode();
   const languageLabel = LANGUAGES.find((l) => l.code === language)?.label ?? language;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <FadeInView style={styles.bentoRow}>
+      <View style={styles.group}>
         {/* Language names stay as written, so anyone can find their own language */}
-        <ControlTile
+        <SettingRow
           icon="translate"
           label={t("settings.languageTitle")}
           value={languageLabel}
           action={t("settings.regionChange")}
           onPress={() => setLanguageOpen(true)}
         />
+        <View style={styles.divider} />
         {/* Region labels are proper names, not translated */}
-        <ControlTile
+        <SettingRow
           icon="map-marker"
           label={t("settings.regionTitle")}
           value={getRegionLabel(region)}
           action={t("settings.regionChange")}
           onPress={() => setPickerOpen(true)}
         />
-      </FadeInView>
+      </View>
 
-      <FadeInView index={1}>
-        <InfoTile icon="crosshairs-gps" title={t("settings.weatherTitle")} text={t("settings.weatherHint")} />
-      </FadeInView>
+      <View style={styles.section} accessibilityRole="radiogroup">
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("settings.displayTitle")}</Text>
+        <OptionRow label={t("settings.themeDay")} selected={mode === "day"} onPress={() => setMode("day")} />
+        <OptionRow label={t("settings.themeNight")} selected={mode === "night"} onPress={() => setMode("night")} />
+      </View>
 
-      <FadeInView index={2}>
-        <Surface variant="glass" style={styles.about}>
-          <View style={styles.aboutHead}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="sprout" size={22} color={colors.primary} />
-            </View>
-            <View style={styles.aboutText}>
-              <Text style={styles.overline}>{t("settings.aboutTitle")}</Text>
-              <Text style={styles.aboutName}>AgriVoice v1.0.0</Text>
-            </View>
-          </View>
-          <Text style={styles.infoText}>{t("settings.aboutDescription")}</Text>
-          <Text style={styles.aboutTech}>{t("settings.poweredBy", { tech: TECH })}</Text>
-        </Surface>
-      </FadeInView>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("settings.weatherTitle")}</Text>
+        <Text style={styles.infoText}>{t("settings.weatherHint")}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("settings.aboutTitle")}</Text>
+        <Text style={styles.aboutName}>AgriVoice v1.0.0</Text>
+        <Text style={styles.infoText}>{t("settings.aboutDescription")}</Text>
+        <Text style={styles.aboutTech}>{t("settings.poweredBy", { tech: TECH })}</Text>
+      </View>
 
       <BottomSheet visible={languageOpen} onClose={() => setLanguageOpen(false)} closeLabel={t("history.close")}>
         <View style={styles.sheetBody}>
@@ -135,43 +135,25 @@ export default function SettingsScreen() {
   );
 }
 
-// A bento control: what it is, its current value, and a tap to change it
-function ControlTile({ icon, label, value, action, onPress }: {
+// One setting: icon, what it is, its current value, and a tap to change it
+function SettingRow({ icon, label, value, action, onPress }: {
   icon: IconName; label: string; value: string; action: string; onPress: () => void;
 }) {
   return (
     <PressableScale
-      style={styles.tileWrap}
+      style={styles.row}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${value}. ${action}`}
     >
-      <Surface variant="raised" style={styles.tile}>
-        <View style={styles.iconCircle}>
-          <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
-        </View>
-        <Text style={styles.overline}>{label}</Text>
-        <Text style={styles.tileValue} numberOfLines={3}>{value}</Text>
-        <View style={styles.tileAction}>
-          <Text style={styles.tileActionText}>{action}</Text>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
-        </View>
-      </Surface>
+      <MaterialCommunityIcons name={icon} size={24} color={colors.primary} />
+      <View style={styles.rowText}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={styles.rowValue}>{value}</Text>
+      </View>
+      <Text style={styles.rowAction}>{action}</Text>
+      <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
     </PressableScale>
-  );
-}
-
-function InfoTile({ icon, title, text }: { icon: IconName; title: string; text: string }) {
-  return (
-    <Surface style={styles.info}>
-      <View style={styles.iconCircle}>
-        <MaterialCommunityIcons name={icon} size={22} color={colors.secondary} />
-      </View>
-      <View style={styles.infoBody}>
-        <Text style={styles.overline}>{title}</Text>
-        <Text style={styles.infoText}>{text}</Text>
-      </View>
-    </Surface>
   );
 }
 
@@ -196,26 +178,21 @@ function OptionRow({ label, selected, onPress }: { label: string; selected: bool
 
 const styles = themed(() => StyleSheet.create({
   container:          { flex: 1, backgroundColor: colors.background },
-  content:            { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  content:            { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl },
 
-  bentoRow:           { flexDirection: "row", gap: spacing.md },
-  tileWrap:           { flex: 1 },
-  tile:               { flex: 1, gap: spacing.sm, minHeight: 176 },
-  iconCircle:         { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
-                        backgroundColor: colors.background },
-  overline:           { ...type.overline, color: colors.textSecondary },
-  tileValue:          { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flexGrow: 1 },
-  tileAction:         { flexDirection: "row", alignItems: "center", gap: 2 },
-  tileActionText:     { ...type.body, fontFamily: fonts.bold, color: colors.primary },
+  group:              { borderRadius: radius.sm, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.glassBorder },
+  row:                { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 72,
+                        paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  rowText:            { flex: 1 },
+  rowLabel:           { ...type.caption, color: colors.textSecondary },
+  rowValue:           { ...type.body, fontFamily: fonts.bold, color: colors.text },
+  rowAction:          { ...type.body, fontFamily: fonts.bold, color: colors.primary },
+  divider:            { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginLeft: spacing.lg + 24 + spacing.md },
 
-  info:               { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  infoBody:           { flex: 1, gap: spacing.xs },
+  section:            { gap: spacing.sm },
+  sectionTitle:       { ...type.overline, color: colors.textSecondary },
   infoText:           { ...type.body, color: colors.textSecondary },
-
-  about:              { gap: spacing.sm },
-  aboutHead:          { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  aboutText:          { flex: 1 },
-  aboutName:          { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
+  aboutName:          { ...type.body, fontFamily: fonts.bold, color: colors.text },
   aboutTech:          { ...type.caption, color: colors.accent },
 
   sheetBody:          { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },

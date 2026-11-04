@@ -1,21 +1,21 @@
 /**
  * HistoryScreen — Shows past voice queries saved to AsyncStorage.
- * Each entry shows the transcript and AI reply; tapping one opens the full details.
+ * A timeline of questions with the start of each answer; tapping one opens the full answer,
+ * which can be read aloud or asked again.
  */
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, SectionList, StyleSheet, Alert, ScrollView } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { loadHistory, deleteHistoryEntry, clearHistory } from "../services/historyStorage";
-import { LANGUAGES } from "../context/LanguageContext";
+import { LANGUAGES, useLanguage, type LanguageCode } from "../context/LanguageContext";
+import { speak, stopSpeaking } from "../services/speech";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useT, type StringKey, type Translate } from "../i18n";
 import type { HistoryEntry } from "../types";
 import StatusView from "../components/StatusView";
-import Surface from "../components/Surface";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import BottomSheet from "../components/BottomSheet";
-import FadeInView from "../components/FadeInView";
 import PressableScale from "../components/PressableScale";
 import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
@@ -128,26 +128,19 @@ export default function HistoryScreen() {
               <View style={[styles.railLine, index === section.data.length - 1 && styles.railLineEnd]} />
               <View style={styles.railDot} />
             </View>
-            <FadeInView index={index < 6 ? index : 0} style={styles.cardWrap}>
-              <PressableScale
-                onPress={() => { setActionError(null); setSelected(item); }}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.transcript || "—"}. ${t("history.view")}`}
-              >
-                <Surface style={styles.card}>
-                  <Meta entry={item} t={t} />
-                  <Text style={styles.question} numberOfLines={2}>{item.transcript || "—"}</Text>
-                  <View style={styles.answerRow}>
-                    <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color={colors.secondary} />
-                    <Text style={styles.answer} numberOfLines={2}>{item.reply || "—"}</Text>
-                  </View>
-                  <View style={styles.viewRow}>
-                    <Text style={styles.viewText}>{t("history.view")}</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={22} color={colors.primary} />
-                  </View>
-                </Surface>
-              </PressableScale>
-            </FadeInView>
+            <PressableScale
+              style={styles.entry}
+              onPress={() => { setActionError(null); setSelected(item); }}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.transcript || "—"}. ${t("history.view")}`}
+            >
+              <View style={styles.entryBody}>
+                <Meta entry={item} t={t} />
+                <Text style={styles.question} numberOfLines={2}>{item.transcript || "—"}</Text>
+                <Text style={styles.answer} numberOfLines={2}>{item.reply || "—"}</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={22} color={colors.textSecondary} />
+            </PressableScale>
           </View>
         )}
         ListEmptyComponent={
@@ -165,6 +158,11 @@ export default function HistoryScreen() {
         entry={selected}
         onClose={() => setSelected(null)}
         onDelete={confirmDelete}
+        onAskAgain={(entry) => {
+          setSelected(null);
+          // `at` makes asking the same question twice still fill the Voice screen
+          navigation.navigate({ name: "Voice", params: { question: entry.transcript, at: Date.now() } } as never);
+        }}
         actionError={actionError ? t(actionError) : null}
         t={t}
       />
@@ -191,16 +189,38 @@ function groupByDay(entries: HistoryEntry[], t: Translate) {
 }
 
 // The full question and answer in a bottom sheet. Keeps showing the last entry while the sheet slides away.
-function DetailSheet({ entry, onClose, onDelete, actionError, t }: {
+function DetailSheet({ entry, onClose, onDelete, onAskAgain, actionError, t }: {
   entry: HistoryEntry | null;
   onClose: () => void;
   onDelete: (entry: HistoryEntry) => void;
+  onAskAgain: (entry: HistoryEntry) => void;
   actionError: string | null;
   t: Translate;
 }) {
   const last = useRef<HistoryEntry | null>(null);
   if (entry) last.current = entry;
   const shown = entry ?? last.current;
+
+  // Read-aloud in the language the answer was given in (the current one if it was saved without)
+  const { language } = useLanguage();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const readingRef = useRef(0);
+  const stopAnswer = () => {
+    readingRef.current++;
+    setIsSpeaking(false);
+    stopSpeaking();
+  };
+  const startSpeaking = (item: HistoryEntry) => {
+    const reading = ++readingRef.current;
+    const current = () => readingRef.current === reading;
+    const saved = LANGUAGES.find((l) => l.code === item.language)?.code as LanguageCode | undefined;
+    setIsSpeaking(true);
+    speak(item.reply, saved ?? language, () => { if (current()) setIsSpeaking(false); }, current);
+  };
+  // Closing the sheet, switching entries or leaving the tab stops the reading
+  useEffect(() => stopAnswer, [entry?.id]);
+  useFocusEffect(useCallback(() => () => stopAnswer(), []));
+
   return (
     <BottomSheet visible={entry !== null} onClose={onClose} closeLabel={t("history.close")}>
       {shown && (
@@ -212,14 +232,27 @@ function DetailSheet({ entry, onClose, onDelete, actionError, t }: {
           {actionError && <ActionError text={actionError} />}
           <ScrollView contentContainerStyle={styles.sheetBody}>
             <Meta entry={shown} t={t} />
-            <Surface variant="raised" style={styles.detailCard}>
+            <View style={styles.detailBlock}>
               <DetailTitle icon="account-voice" text={t("voice.yourQuestion")} />
-              <Text style={styles.detailText} selectable>{shown.transcript || "—"}</Text>
-            </Surface>
-            <Surface variant="raised" style={[styles.detailCard, styles.replyCard]}>
+              <Text style={styles.detailQuestion} selectable>{shown.transcript || "—"}</Text>
+            </View>
+            <View style={styles.detailBlock}>
               <DetailTitle icon="lightbulb-on-outline" text={t("history.answer")} />
               <Text style={styles.detailText} selectable>{shown.reply || "—"}</Text>
-            </Surface>
+            </View>
+            <View style={styles.sheetActions}>
+              {shown.reply !== "" && (
+                <Button
+                  label={isSpeaking ? t("voice.stopSpeaking") : t("voice.listen")}
+                  icon={isSpeaking ? "stop" : "volume-high"}
+                  variant="secondary"
+                  onPress={isSpeaking ? stopAnswer : () => startSpeaking(shown)}
+                />
+              )}
+              {shown.transcript !== "" && (
+                <Button label={t("voice.askAgain")} icon="send" onPress={() => onAskAgain(shown)} />
+              )}
+            </View>
           </ScrollView>
         </>
       )}
@@ -287,18 +320,17 @@ const styles = themed(() => StyleSheet.create({
   rail:            { width: 28, alignItems: "center" },
   railLine:        { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: colors.earth, opacity: 0.6 },
   railLineEnd:     { bottom: "60%" },
-  railDot:         { marginTop: spacing.xl, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary,
+  railDot:         { marginTop: spacing.lg, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary,
                      borderWidth: 2, borderColor: colors.background },
-  cardWrap:        { flex: 1, paddingBottom: spacing.md },
-  card:            { gap: spacing.sm },
+  // Entries are plain rows on the page; the rail and a hairline separate them
+  entry:           { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md,
+                     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+  entryBody:       { flex: 1, gap: spacing.xs },
   metaRow:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
   timeRow:         { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   time:            { ...type.caption, color: colors.textSecondary },
-  question:        { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
-  answerRow:       { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  answer:          { ...type.body, color: colors.textSecondary, flex: 1 },
-  viewRow:         { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", minHeight: 32 },
-  viewText:        { ...type.body, fontFamily: fonts.bold, color: colors.primary },
+  question:        { ...type.body, fontFamily: fonts.bold, color: colors.text },
+  answer:          { ...type.caption, color: colors.textSecondary },
 
   actionError:     { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.sm,
                      padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.dangerBg },
@@ -306,9 +338,10 @@ const styles = themed(() => StyleSheet.create({
 
   sheetHeader:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.xs },
   sheetBody:       { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  detailCard:      { gap: spacing.sm },
-  replyCard:       { borderLeftWidth: 3, borderLeftColor: colors.primary },
+  detailBlock:     { gap: spacing.sm },
+  detailQuestion:  { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text },
+  sheetActions:    { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   detailTitleRow:  { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  detailTitle:     { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.text, flex: 1 },
-  detailText:      { ...type.body, color: colors.text },
+  detailTitle:     { ...type.body, fontFamily: fonts.bold, color: colors.textSecondary, flex: 1 },
+  detailText:      { ...type.bodyLarge, color: colors.text },
 }));

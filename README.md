@@ -9,7 +9,7 @@ A voice-powered mobile assistant for Filipino farmers, providing real-time crop 
 | Layer         | Technology               | Purpose                                              |
 |---------------|--------------------------|------------------------------------------------------|
 | **Mobile App**    | React Native + Expo      | Cross-platform mobile UI with microphone access      |
-| **AI Engine** | Groq API                 | Whisper-Large-v3 (STT) + Llama 3.3 70B (LLM)       |
+| **AI Engine** | Groq API                 | Whisper-Large-v3 (STT) + GPT-OSS 120B/20B (LLM)    |
 | **Backend**   | Python + FastAPI         | Audio upload handling, Groq orchestration, price sync|
 | **Database**  | Supabase (PostgreSQL)    | Market prices, crop data, user history               |
 
@@ -86,7 +86,7 @@ Scan the QR code with the **Expo Go** app on your phone.
 ## Features
 - 🎤 Voice recording with one-tap capture
 - 🗣️ Speech-to-text via Groq Whisper (multi-language)
-- 🤖 AI crop/market advice via Llama 3.3 70B
+- 🤖 AI crop/market advice via GPT-OSS 120B
 - 📈 Daily market price tracking
 - 🌤️ Weather integration
 - 🌏 Multi-language support (Filipino, Cebuano, Ilocano, English)

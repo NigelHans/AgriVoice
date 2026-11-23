@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
 
+    # When set, voice and chat require this value in the X-App-Key header (see core/security.py)
+    APP_API_KEY: str = ""
+
     # Pull the latest WFP prices into Supabase in the background on startup
     PRICE_SYNC_ON_STARTUP: bool = True
 

@@ -107,8 +107,45 @@ export async function fetchPriceHistory(cropName: string, days = 30) {
 // ---------------------------------------------------------------------------
 // Weather
 // ---------------------------------------------------------------------------
+// The phone asks Open-Meteo directly: the hosted backend shares its outbound IP with other apps and
+// Open-Meteo's free tier rate-limits it (429). Same request as backend/app/services/weather_service.py.
+const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
+
+async function fetchOpenMeteo(lat: number, lon: number): Promise<WeatherForecast> {
+  const response = await axios.get(OPEN_METEO_URL, {
+    timeout: 15_000,
+    params: {
+      latitude: lat,
+      longitude: lon,
+      daily: "temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max,weathercode",
+      timezone: "Asia/Manila",
+      forecast_days: 7,
+    },
+  });
+  const d = response.data?.daily;
+  if (!d || !Array.isArray(d.time)) throw new Error("Open-Meteo response has no daily forecast");
+  return {
+    latitude: lat,
+    longitude: lon,
+    daily: d.time.map((date: string, i: number) => ({
+      date,
+      temp_max: d.temperature_2m_max?.[i] ?? null,
+      temp_min: d.temperature_2m_min?.[i] ?? null,
+      rain_probability: d.precipitation_probability_max?.[i] ?? null,
+      wind_speed: d.windspeed_10m_max?.[i] ?? null,
+      weather_code: d.weathercode?.[i] ?? null,
+    })),
+  };
+}
+
 export async function fetchWeather(lat: number, lon: number): Promise<WeatherForecast> {
   if (USE_MOCKS) return mocks.fetchWeather(lat, lon);
-  const response = await api.get("/api/v1/weather/forecast", { params: { lat, lon } });
-  return response.data;
+  try {
+    return await fetchOpenMeteo(lat, lon);
+  } catch (err) {
+    // Open-Meteo unreachable from this phone: the backend route is the fallback
+    console.warn("Direct Open-Meteo request failed; trying the backend", err);
+    const response = await api.get("/api/v1/weather/forecast", { params: { lat, lon } });
+    return response.data;
+  }
 }

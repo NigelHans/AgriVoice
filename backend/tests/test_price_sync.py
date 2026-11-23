@@ -80,3 +80,24 @@ def test_run_price_sync_never_raises(tmp_path, monkeypatch, fake_supabase, error
     fake_supabase(error=error)
     source = _csv(tmp_path, SAMPLE) if error else str(tmp_path / "missing.csv")
     assert price_sync.run_price_sync(source) == 0
+
+
+def test_run_price_sync_upserts_in_batches(tmp_path, monkeypatch, fake_supabase):
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_KEY", "test-key")
+    monkeypatch.setattr(price_sync, "UPSERT_BATCH", 2)
+    db = fake_supabase()
+
+    assert price_sync.run_price_sync(_csv(tmp_path, SAMPLE)) == 3
+
+    batches = [filters[0][1][0] for filters in db.market_prices.executed]
+    assert [len(b) for b in batches] == [2, 1]                      # every row written, 2 per request
+
+
+def test_new_crops_are_mapped(tmp_path):
+    rows = price_sync.build_price_rows(pd.read_csv(_csv(tmp_path, [
+        '2026-08-15,Region I,Ilocos Norte,Laoag,2,0,0,veg,Eggplants,1,KG,actual,Retail,PHP,90,2',
+        '2026-08-15,Region I,Ilocos Norte,Laoag,2,0,0,veg,Cabbage (chinese),1,KG,actual,Retail,PHP,100,2',
+        '2026-08-15,Region I,Ilocos Norte,Laoag,2,0,0,fish,Fish (tilapia),1,KG,actual,Retail,PHP,180,2',  # not a crop
+    ])))
+    assert sorted(r["crop_name"] for r in rows) == ["Chinese Cabbage", "Eggplant"]

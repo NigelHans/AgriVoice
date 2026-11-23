@@ -21,7 +21,8 @@ def test_prices_returns_latest_per_crop_and_region(client, fake_supabase):
     filters = db.market_prices.executed[0]
     assert "eq" not in [op for op, _, _ in filters]            # no longer restricted to today's date
     orders = [(args, kwargs) for op, args, kwargs in filters if op == "order"]
-    assert orders == [(("is_legacy",), {}), (("price_date",), {"desc": True})]   # verified first, newest first
+    # verified first, newest first; id keeps pages stable
+    assert orders == [(("is_legacy",), {}), (("price_date",), {"desc": True}), (("id",), {})]
 
 
 def test_prices_prefer_verified_over_newer_legacy_row(client, fake_supabase):
@@ -80,3 +81,27 @@ def test_history_uses_documented_columns(client, fake_supabase):
 
 def test_history_rejects_out_of_range_days(client):
     assert client.get("/api/v1/market/history/Onion", params={"days": 0}).status_code == 422
+
+
+def test_prices_reads_every_page(client, fake_supabase, monkeypatch):
+    from app.services import market_service
+    monkeypatch.setattr(market_service, "PAGE_SIZE", 2)
+    pages = {0: [_row("Onion", "Region I", 130, "2026-08-15"), _row("Onion", "Region II", 120, "2026-08-15")],
+             2: [_row("Garlic", "Region I", 160, "2026-08-15"), _row("Garlic", "Region II", 150, "2026-08-15")],
+             4: [_row("Squash", "Region I", 50, "2026-08-15")]}
+
+    def respond(filters):
+        start = next(args[0] for op, args, _ in filters if op == "range")
+        return pages.get(start, [])
+
+    db = fake_supabase(respond=respond)
+    body = client.get("/api/v1/market/prices").json()
+
+    assert body["count"] == 5                                   # rows from all three pages
+    assert len(db.market_prices.executed) == 3                  # stops after the short page
+
+
+def test_history_matches_the_crop_name_exactly(client, fake_supabase):
+    db = fake_supabase(respond=lambda filters: [])
+    client.get("/api/v1/market/history/Cabbage", params={"days": 365})
+    assert ("ilike", ("crop_name", "Cabbage"), {}) in db.market_prices.executed[0]   # not %Cabbage%

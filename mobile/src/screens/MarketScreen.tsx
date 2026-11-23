@@ -11,6 +11,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { fetchMarketPrices, fetchPriceHistory } from "../services/api";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
+import { useLanguage } from "../context/LanguageContext";
+import { cropLabel, cropSearchText } from "../i18n/crops";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
 import type { CropPrice } from "../types";
 import StatusView from "../components/StatusView";
@@ -84,7 +86,7 @@ export default function MarketScreen() {
   );
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return query ? inScope.filter((p) => p.crop_name.toLowerCase().includes(query)) : inScope;
+    return query ? inScope.filter((p) => cropSearchText(p.crop_name).includes(query)) : inScope;
   }, [inScope, search]);
 
   if (loading) return <StatusView loading />;
@@ -233,6 +235,7 @@ function unitOf(item: CropPrice): string {
 
 // One board row: crop on the left, price on the right; region (when showing all) and month underneath
 function PriceRow({ item, showRegion, onPress, t }: { item: CropPrice; showRegion: boolean; onPress: () => void; t: Translate }) {
+  const { language } = useLanguage();
   // A legacy row's price_date is only the date it was synced, so it is never shown
   const when = item.is_legacy ? t("market.legacyBadge") : formatPriceMonth(item.price_date);
   const meta = [showRegion ? getRegionLabel(item.region) : null, when].filter(Boolean).join(", ");
@@ -241,11 +244,11 @@ function PriceRow({ item, showRegion, onPress, t }: { item: CropPrice; showRegio
       style={styles.row}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${item.crop_name}, ₱${formatAmount(item.price_per_kg)} / ${unitOf(item)}. ${meta}`}
+      accessibilityLabel={`${cropLabel(item.crop_name, language)}, ₱${formatAmount(item.price_per_kg)} / ${unitOf(item)}. ${meta}`}
     >
       <MaterialCommunityIcons name={cropIcon(item.crop_name)} size={26} color={item.is_legacy ? colors.textSecondary : colors.primary} />
       <View style={styles.rowInfo}>
-        <Text style={styles.rowCrop} numberOfLines={2}>{item.crop_name}</Text>
+        <Text style={styles.rowCrop} numberOfLines={2}>{cropLabel(item.crop_name, language)}</Text>
         {meta ? <Text style={styles.rowMeta} numberOfLines={2}>{meta}</Text> : null}
       </View>
       <PriceText value={item.price_per_kg} unit={unitOf(item)} size="headline"
@@ -262,6 +265,7 @@ function PriceSheet({ item, onClose, onAsk, t }: {
   onAsk: (item: CropPrice) => void;
   t: Translate;
 }) {
+  const { language } = useLanguage();
   // Keeps showing the last price while the sheet slides away
   const last = useRef<CropPrice | null>(null);
   if (item) last.current = item;
@@ -271,7 +275,7 @@ function PriceSheet({ item, onClose, onAsk, t }: {
       {shown && (
         <ScrollView contentContainerStyle={styles.sheetBody}>
           <View>
-            <Text style={styles.sheetCrop} accessibilityRole="header">{shown.crop_name}</Text>
+            <Text style={styles.sheetCrop} accessibilityRole="header">{cropLabel(shown.crop_name, language)}</Text>
             <Text style={styles.sheetRegion}>{getRegionLabel(shown.region)}</Text>
           </View>
           <View style={styles.board}>
@@ -301,8 +305,7 @@ function Trend({ item, t }: { item: CropPrice; t: Translate }) {
     fetchPriceHistory(item.crop_name, 365)
       .then((data: HistoryResponse) => {
         if (!current) return;
-        // shortcut: the endpoint matches crop names loosely and returns every region; points carry no crop
-        // name, so only the region can be checked. Add crop_name to PricePoint if similar names ever mix.
+        // The endpoint matches the crop name exactly and returns every region; keep this region's points
         setPoints((data.history ?? [])
           .filter((p) => p.region === item.region)
           .map((p) => ({ date: p.price_date, price: p.price_per_kg }))
@@ -401,6 +404,15 @@ function PriceDetails({ item, t }: { item: CropPrice; t: Translate }) {
 function cropIcon(cropName: string): keyof typeof MaterialCommunityIcons.glyphMap {
   if (/rice|palay|bigas/i.test(cropName)) return "rice";
   if (/corn|mais/i.test(cropName)) return "corn";
+  if (/carrot/i.test(cropName)) return "carrot";
+  if (/peanut/i.test(cropName)) return "peanut";
+  if (/coconut/i.test(cropName)) return "palm-tree";
+  if (/calamansi/i.test(cropName)) return "fruit-citrus";
+  if (/banana|mango/i.test(cropName)) return "fruit-pear";
+  if (/squash|gourd|chayote/i.test(cropName)) return "fruit-watermelon";
+  if (/cabbage/i.test(cropName)) return "leaf";
+  if (/bean/i.test(cropName)) return "seed";
+  if (/ginger|garlic/i.test(cropName)) return "chili-mild";
   return "sprout";
 }
 

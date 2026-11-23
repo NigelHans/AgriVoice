@@ -20,6 +20,7 @@ from app.core.groq_client import get_groq_client
 from app.core.supabase_client import get_supabase_client
 from app.schemas.voice import AssistantReply, ExtractedData, PriceStatus
 from app.services.market_service import clean_filter_value
+from app.services.price_sync import CROP_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,12 @@ MAX_HISTORY_TURNS = 10
 PLAIN_TEXT_RULE = """Format: plain text only. No Markdown: no **bold**, no # headings, no tables, no code blocks.
 For a list, start each item on its own line with "• "."""
 
-EXTRACTION_PROMPT = """You extract structured data from a Filipino farmer's message.
+EXTRACTION_PROMPT = f"""You extract structured data from a Filipino farmer's message.
 Respond with a JSON object only, using exactly these keys:
   "intent": "negotiation" if the farmer is asking about a price or a buyer's offer for a crop, otherwise "general"
-  "crop": English singular crop name (e.g. "Onion", "Tomato", "Rice"), or null if no crop is mentioned
+  "crop": the crop in English. Use exactly one of these names when it fits (they have market prices):
+          {", ".join(CROP_NAMES)}.
+          Otherwise an English singular crop name, or null if no crop is mentioned
   "weight_kg": total harvest weight in kilograms as a number, or null if not stated
   "offer_per_kg": the buyer's offered price in pesos per kilogram as a number, or null if not stated
   "language": the language the farmer wrote in: "fil" (Tagalog/Filipino, including Taglish), "ceb" (Cebuano/Bisaya),

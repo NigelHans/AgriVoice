@@ -11,7 +11,8 @@ from app.schemas.market import MarketPriceList, CropPriceHistory, CropPrice, Pri
 
 logger = logging.getLogger(__name__)
 
-MAX_ROWS = 2000
+PAGE_SIZE = 1000          # Supabase (PostgREST) returns at most 1000 rows per request
+PRICE_WINDOW_DAYS = 180   # the price list only needs recent months; older rows are history
 
 
 def clean_filter_value(value: str) -> str:
@@ -27,25 +28,39 @@ def _execute(query):
         raise ExternalServiceError("Price database", str(exc)) from exc
 
 
+def _fetch_all(build_query) -> list[dict]:
+    """All rows of a query, one page at a time. build_query() makes a fresh query for each page."""
+    rows: list[dict] = []
+    start = 0
+    while True:
+        page = _execute(build_query().range(start, start + PAGE_SIZE - 1)).data
+        rows.extend(page)
+        if len(page) < PAGE_SIZE:
+            return rows
+        start += PAGE_SIZE
+
+
 async def get_prices(region: str = "", crop: str = "") -> MarketPriceList:
     """
     Latest known price for every crop/region, optionally filtered by region and/or crop.
     Verified rows always win over legacy rows (is_legacy), whose price_date is only a sync date.
     """
     db = get_supabase_client()
-    query = db.table("market_prices").select("*")
-
     region, crop = clean_filter_value(region), clean_filter_value(crop)
-    if region:
-        query = query.ilike("region", f"%{region}%")
-    if crop:
-        query = query.ilike("crop_name", f"%{crop}%")
+    since = (date.today() - timedelta(days=PRICE_WINDOW_DAYS)).isoformat()
 
-    result = _execute(query.order("is_legacy").order("price_date", desc=True).limit(MAX_ROWS))
+    def build_query():
+        query = db.table("market_prices").select("*").gte("price_date", since)
+        if region:
+            query = query.ilike("region", f"%{region}%")
+        if crop:
+            query = query.ilike("crop_name", f"%{crop}%")
+        # id breaks ties so pages never overlap or skip rows
+        return query.order("is_legacy").order("price_date", desc=True).order("id")
 
     # Rows arrive verified-first, newest first, so the first row per crop/region is the one to show
     latest: dict[tuple[str, str], CropPrice] = {}
-    for row in result.data:
+    for row in _fetch_all(build_query):
         key = (row["crop_name"], row["region"])
         if key not in latest:
             latest[key] = CropPrice(**row)
@@ -62,7 +77,8 @@ async def get_price_history(crop_name: str, days: int = 30) -> CropPriceHistory:
     result = _execute(
         db.table("market_prices")
         .select("price_date, price_per_kg, region")
-        .ilike("crop_name", f"%{clean_filter_value(crop_name)}%")
+        # Exact (case-insensitive) name: "Cabbage" must not pull in "Chinese Cabbage"
+        .ilike("crop_name", clean_filter_value(crop_name))
         .eq("is_legacy", False)
         .gte("price_date", since)
         .order("price_date")

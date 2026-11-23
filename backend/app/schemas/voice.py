@@ -27,6 +27,8 @@ class AssistantReply(BaseModel):
     price_date: date | None = None
     price_source: str | None = None
     strategy: str
+    # Language the reply is written in: the one the farmer spoke, which may differ from the app setting
+    language: Literal["fil", "ceb", "ilo", "en"] | None = None
 
 
 class VoiceResponse(BaseModel):

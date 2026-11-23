@@ -55,6 +55,8 @@ export interface AssistantReply {
   price_region: string | null;
   price_date: string | null;
   price_source: string | null;
+  /** Language the reply is written in (the one the farmer spoke); may differ from the app setting */
+  language?: "fil" | "ceb" | "ilo" | "en" | null;
   strategy: string;
 }
 

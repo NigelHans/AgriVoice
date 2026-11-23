@@ -235,3 +235,19 @@ def test_translate_returns_plain_text_in_target_language(client, fake_groq):
 def test_translate_rejects_unknown_language(client, fake_groq):
     fake_groq()
     assert client.post("/api/v1/chat/translate", json={"text": "Hi", "language": "xx"}).status_code == 422
+
+
+def test_reply_uses_the_language_the_farmer_wrote_in(client, fake_groq, fake_supabase):
+    groq_fake = fake_groq(chat_replies=[extraction(intent="general", language="ceb"), "Gamita ang compost."])
+    fake_supabase()
+    body = client.post("/api/v1/chat/ask", json={"message": "Unsaon pag-abono sa humay?", "language": "fil"}).json()
+    assert body["analysis"]["language"] == "ceb"
+    assert "Write the whole reply in Cebuano" in groq_fake.chat_calls[1]["messages"][-1]["content"]
+
+
+def test_unknown_detected_language_falls_back_to_setting(client, fake_groq, fake_supabase):
+    groq_fake = fake_groq(chat_replies=[extraction(intent="general", language="klingon"), "Use compost."])
+    fake_supabase()
+    body = client.post("/api/v1/chat/ask", json={"message": "Hi", "language": "ilo"}).json()
+    assert body["analysis"]["language"] == "ilo"
+    assert "Write the whole reply in Ilocano" in groq_fake.chat_calls[1]["messages"][-1]["content"]

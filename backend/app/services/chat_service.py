@@ -43,14 +43,20 @@ Respond with a JSON object only, using exactly these keys:
   "crop": English singular crop name (e.g. "Onion", "Tomato", "Rice"), or null if no crop is mentioned
   "weight_kg": total harvest weight in kilograms as a number, or null if not stated
   "offer_per_kg": the buyer's offered price in pesos per kilogram as a number, or null if not stated
+  "language": the language the farmer wrote in: "fil" (Tagalog/Filipino, including Taglish), "ceb" (Cebuano/Bisaya),
+              "ilo" (Ilocano) or "en" (English); null if the message is too short or unclear to tell
 Never guess numbers that the farmer did not say.
 The message may come from speech recognition, so a word can be misheard (e.g. "sibuyas" as "si buyas"):
 read it in context and pick the crop the farmer clearly means."""
 
 
+LanguageCode = Literal["fil", "ceb", "ilo", "en"]
+
+
 class QueryExtraction(BaseModel):
     intent: Literal["negotiation", "general"] = "general"
     crop: str | None = None
+    language: LanguageCode | None = None
     weight_kg: float | None = None
     offer_per_kg: float | None = None
 
@@ -58,6 +64,12 @@ class QueryExtraction(BaseModel):
     @classmethod
     def _normalize_intent(cls, value):
         return "negotiation" if str(value).strip().lower() == "negotiation" else "general"
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def _known_language_or_none(cls, value):
+        value = str(value).strip().lower() if value else None
+        return value if value in ("fil", "ceb", "ilo", "en") else None
 
     @field_validator("crop", mode="before")
     @classmethod
@@ -265,6 +277,7 @@ Keep it conversational, encouraging, and actionable.
         price_date=price.price_date,
         price_source=price.source,
         strategy=plain_text(strategy),
+        language=language,
     )
 
 
@@ -305,6 +318,7 @@ The farmer's message may come from speech recognition and contain misheard words
         extracted_data=ExtractedData(crop=extraction.crop, weight=extraction.weight_kg, offer_per_kg=extraction.offer_per_kg),
         price_status="not_applicable",
         strategy=plain_text(answer),
+        language=language,
     )
 
 
@@ -330,8 +344,10 @@ async def get_ai_response(
     location: str = "National Capital Region",
     history: list[dict] | None = None,
 ) -> AssistantReply:
-    """Answer a farmer's message: negotiation analysis when a crop price/offer is involved, otherwise advice."""
+    """Answer a farmer's message: negotiation analysis when a crop price/offer is involved, otherwise advice.
+    The reply is in the language the farmer actually used; `language` (the app setting) is the fallback."""
     extraction = await extract_query(message)
+    language = extraction.language or language
 
     is_negotiation = extraction.crop is not None and (
         extraction.intent == "negotiation" or extraction.offer_per_kg is not None

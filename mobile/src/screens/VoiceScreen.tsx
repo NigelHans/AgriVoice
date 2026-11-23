@@ -29,7 +29,7 @@ import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { sendVoiceQuery, sendTextQuery, translateText } from "../services/api";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
-import { useLanguage, type LanguageCode } from "../context/LanguageContext";
+import { LANGUAGES, useLanguage, type LanguageCode } from "../context/LanguageContext";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
 import Button from "../components/Button";
@@ -107,11 +107,11 @@ export default function VoiceScreen() {
   // Read-aloud state. Each reading gets a number, so a stopped reading can't clear a newer one.
   const [isSpeaking, setIsSpeaking] = useState(false);
   const readingRef = useRef(0);
-  const startSpeaking = (text: string) => {
+  const startSpeaking = (text: string, lang: LanguageCode) => {
     const reading = ++readingRef.current;
     setIsSpeaking(true);
     const current = () => readingRef.current === reading;
-    speak(text, language, () => { if (current()) setIsSpeaking(false); }, current);
+    speak(text, lang, () => { if (current()) setIsSpeaking(false); }, current);
   };
   const stopAnswer = () => {
     readingRef.current++;
@@ -123,10 +123,18 @@ export default function VoiceScreen() {
   // A new answer replaces the object, so a translation that finishes late can't overwrite it.
   const answersRef = useRef<{ original: string; byLanguage: Partial<Record<LanguageCode, string>> } | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  // Language of the answer text on screen: the one the farmer spoke, until they pick another to translate
+  const [answerLang, setAnswerLang] = useState<LanguageCode>(language);
+  // "Translate to <selected>" re-runs the effect below without a language change
+  const [translateRequest, setTranslateRequest] = useState(0);
   useEffect(() => {
     const answers = answersRef.current;
     if (!reply || !answers) return;
-    const show = (text: string) => setReply((r) => (r && answersRef.current === answers ? { ...r, strategy: text } : r));
+    const show = (text: string) => {
+      if (answersRef.current !== answers) return;
+      setReply((r) => (r ? { ...r, strategy: text } : r));
+      setAnswerLang(language);
+    };
     stopAnswer();
     const cached = answers.byLanguage[language];
     if (cached !== undefined) {
@@ -147,7 +155,7 @@ export default function VoiceScreen() {
       })
       .finally(() => { if (!cancelled) setIsTranslating(false); });
     return () => { cancelled = true; setIsTranslating(false); };
-  }, [language]);
+  }, [language, translateRequest]);
 
   // Leaving the tab (or unmounting) mid-recording discards the recording and releases the mic
   useFocusEffect(useCallback(() => () => {
@@ -233,15 +241,17 @@ export default function VoiceScreen() {
 
     const audioUri = uri;
     let answer = "";
+    let answerLanguage: LanguageCode = language;
     const answered = await submit(async () => {
       const result = await sendVoiceQuery(audioUri, language, region);
       // Whisper was unsure: no answer yet, the farmer confirms or edits the question first
       const reply = result.needs_confirmation ? null : result.reply;
       answer = reply?.strategy ?? "";
+      answerLanguage = reply?.language ?? language;
       return { question: result.transcript, reply };
     });
     // Asked by voice, answered by voice
-    if (answered) startSpeaking(answer);
+    if (answered) startSpeaking(answer, answerLanguage);
   };
 
   // The auto-stop callback is created when recording starts; this ref lets it call the latest stopRecording
@@ -280,12 +290,15 @@ export default function VoiceScreen() {
       const result = await request();
       setTranscript(result.question);
       setConfirming(result.reply === null);
-      answersRef.current = result.reply && { original: result.reply.strategy, byLanguage: { [language]: result.reply.strategy } };
+      // The backend answers in the language the farmer used, which may not be the selected one
+      const lang = result.reply?.language ?? language;
+      answersRef.current = result.reply && { original: result.reply.strategy, byLanguage: { [lang]: result.reply.strategy } };
+      setAnswerLang(lang);
       setReply(result.reply);
       setIsEditing(false);
       if (!result.reply) return false;
       // A storage failure is logged, never shown as a failed query
-      await appendHistory({ transcript: result.question, reply: result.reply.strategy, language })
+      await appendHistory({ transcript: result.question, reply: result.reply.strategy, language: lang })
         .catch((err) => console.warn("Could not save query to history", err));
       return true;
     } catch (err) {
@@ -319,12 +332,14 @@ export default function VoiceScreen() {
   // "Yes, ask this": the question was spoken, so the answer is read aloud as well
   const confirmAsk = async () => {
     let answer = "";
+    let answerLanguage: LanguageCode = language;
     const answered = await submit(async () => {
       const result = await sendTextQuery(transcript, language, region);
       answer = result.analysis.strategy;
+      answerLanguage = result.analysis.language ?? language;
       return { question: transcript, reply: result.analysis };
     });
-    if (answered) startSpeaking(answer);
+    if (answered) startSpeaking(answer, answerLanguage);
   };
 
   const startEditing = () => {
@@ -467,11 +482,23 @@ export default function VoiceScreen() {
               icon="lightbulb-on-outline"
               text={reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
             />
+            {answerLang !== language && !isTranslating && (
+              <View>
+                <Text style={styles.regionText}>{t("voice.answeredIn", { language: languageLabel(answerLang) })}</Text>
+                <Button
+                  label={t("voice.translateTo", { language: languageLabel(language) })}
+                  variant="text"
+                  icon="translate"
+                  onPress={() => setTranslateRequest((n) => n + 1)}
+                  style={styles.listenButton}
+                />
+              </View>
+            )}
             <Button
               label={isSpeaking ? t("voice.stopSpeaking") : t("voice.listen")}
               icon={isSpeaking ? "stop" : "volume-high"}
               variant="secondary"
-              onPress={isSpeaking ? stopAnswer : () => startSpeaking(reply.strategy)}
+              onPress={isSpeaking ? stopAnswer : () => startSpeaking(reply.strategy, answerLang)}
               disabled={isTranslating}
               style={styles.listenButton}
             />
@@ -558,6 +585,10 @@ export default function VoiceScreen() {
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+function languageLabel(code: LanguageCode): string {
+  return LANGUAGES.find((l) => l.code === code)?.label ?? code;
 }
 
 // Dictionary labels end with ":" for the old layout; beside a value the colon is dropped

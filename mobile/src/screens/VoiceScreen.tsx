@@ -5,165 +5,695 @@
  * 1. Farmer taps the big microphone button → recording starts
  * 2. Farmer taps again → recording stops → audio sent to backend
  * 3. Backend returns transcript + AI reply
- * 4. Reply is displayed (and optionally played via TTS)
+ * 4. Reply is displayed; a spoken question also gets its answer read aloud
+ *
+ * Without the microphone, the farmer can type the question instead. A recognised
+ * transcript can be corrected and asked again; both go through /chat/ask.
  */
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
+  TextInput,
   ScrollView,
-  ActivityIndicator,
+  Animated,
+  Easing,
   StyleSheet,
-  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { Audio } from "expo-av";
-import { Ionicons } from "@expo/vector-icons";
-import { sendVoiceQuery } from "../services/api";
-import { useLanguage } from "../context/LanguageContext";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRoute } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
+import { sendVoiceQuery, sendTextQuery, translateText } from "../services/api";
+import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
+import { useLanguage, type LanguageCode } from "../context/LanguageContext";
+import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
+import Button from "../components/Button";
+import FadeInView from "../components/FadeInView";
+import PressableScale from "../components/PressableScale";
+import PriceText from "../components/PriceText";
+import { useReduceMotion } from "../components/motion";
+import { appendHistory } from "../services/historyStorage";
+import { speak, stopSpeaking } from "../services/speech";
+import type { AssistantReply } from "../types";
+import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
-// STEP 1: Define the TypeScript rule for the props coming from App.tsx
-interface VoiceScreenProps {
-  selectedRegion: string;
-}
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
-// STEP 2: Accept selectedRegion inside the component function arguments
-export default function VoiceScreen({ selectedRegion }: VoiceScreenProps) {
+const MIC = 96;           // microphone disc (bottom right, within thumb reach)
+const RING = MIC + 16;    // leaf / ember ring around it
+const ARC = RING + 16;    // processing arc
+
+// Recording. shortcut: SPEECH_DB and SILENCE_MS are first guesses (mic levels differ per phone);
+// tune them on real phones outdoors if recordings stop too early or never stop.
+const SPEECH_DB = -40;            // louder than this (dBFS) counts as speaking
+const SILENCE_MS = 1500;          // pause after speaking that ends a tapped recording
+const MAX_RECORDING_MS = 60_000;  // hard stop
+const NO_SPEECH_MS = 6000;        // a tapped recording with no speech at all stops after this
+const HOLD_MS = 500;              // a press at least this long is hold-to-talk: release stops
+
+// Example questions for a first-time user; tapping one asks it
+const SUGGESTIONS = ["voice.suggestPrice", "voice.suggestOffer", "voice.suggestPest"] as const;
+
+// Errors are stored as keys and translated when shown, so they follow a language change.
+// `typeInstead` adds the "type your question below" hint.
+type VoiceError = UiMessage & { typeInstead?: boolean };
+const MIC_ERRORS: Record<"denied" | "blocked" | "start" | "stop" | "noSpeech", VoiceError> = {
+  denied:  { key: "voice.micDenied", typeInstead: true },
+  blocked: { key: "voice.micBlocked", typeInstead: true },
+  start:   { key: "voice.micStart", typeInstead: true },
+  stop:    { key: "voice.micStop" },
+  noSpeech: { key: "voice.noSpeech" },
+};
+
+export default function VoiceScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [transcript, setTranscript] = useState("");
 
-  // Changing this state to hold an object or any type instead of a pure string,
-  // since the backend reply now includes structured data fields like weights, prices, and strategy text.
-  const [reply, setReply] = useState<any>(null);
+  // Structured backend reply: negotiation figures (may be null) + strategy/advice text
+  const [reply, setReply] = useState<AssistantReply | null>(null);
+
+  // Farmer-friendly message shown inline; technical details go to console.warn
+  const [error, setError] = useState<VoiceError | null>(null);
+  const t = useT();
+  const [typedText, setTypedText] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState("");
+  // The spoken question may be misheard and has no answer yet ("Did you mean…?")
+  const [confirming, setConfirming] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  // Whether the current recording measured mic levels, and whether any of it was speech
+  const speechRef = useRef<{ metered: boolean; heard: boolean } | null>(null);
+  // Synchronous guard: state updates are async, so a fast double tap could slip past isLoading
+  const busyRef = useRef(false);
   const { language } = useLanguage();
+  // Exact WFP spelling goes to the backend; the label is display-only
+  const { region } = useRegion();
+  const regionLabel = getRegionLabel(region);
+
+  // "Ask about this price" on Market opens Voice with a question ready to send
+  const route = useRoute();
+  const prefill = route.params as { question?: string; at?: number } | undefined;
+  useEffect(() => {
+    if (prefill?.question) setTypedText(prefill.question);
+  }, [prefill?.at]);
+
+  // Read-aloud state. Each reading gets a number, so a stopped reading can't clear a newer one.
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const readingRef = useRef(0);
+  const startSpeaking = (text: string) => {
+    const reading = ++readingRef.current;
+    setIsSpeaking(true);
+    const current = () => readingRef.current === reading;
+    speak(text, language, () => { if (current()) setIsSpeaking(false); }, current);
+  };
+  const stopAnswer = () => {
+    readingRef.current++;
+    setIsSpeaking(false);
+    stopSpeaking();
+  };
+
+  // The current answer in each language it has been shown in, so switching back needs no new request.
+  // A new answer replaces the object, so a translation that finishes late can't overwrite it.
+  const answersRef = useRef<{ original: string; byLanguage: Partial<Record<LanguageCode, string>> } | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  useEffect(() => {
+    const answers = answersRef.current;
+    if (!reply || !answers) return;
+    const show = (text: string) => setReply((r) => (r && answersRef.current === answers ? { ...r, strategy: text } : r));
+    stopAnswer();
+    const cached = answers.byLanguage[language];
+    if (cached !== undefined) {
+      show(cached);
+      return;
+    }
+    let cancelled = false;
+    setIsTranslating(true);
+    setError(null);
+    translateText(answers.original, language)
+      .then((text) => {
+        answers.byLanguage[language] = text;
+        if (!cancelled) show(text);
+      })
+      .catch((err) => {
+        console.warn("Translation failed", err);
+        if (!cancelled) setError(apiErrorMessage(err));
+      })
+      .finally(() => { if (!cancelled) setIsTranslating(false); });
+    return () => { cancelled = true; setIsTranslating(false); };
+  }, [language]);
+
+  // Leaving the tab (or unmounting) mid-recording discards the recording and releases the mic
+  useFocusEffect(useCallback(() => () => {
+    const recording = recordingRef.current;
+    recordingRef.current = null;
+    setIsRecording(false);
+    recording?.stopAndUnloadAsync().catch((err) => console.warn("Could not release recorder", err));
+    stopAnswer();
+  }, []));
 
   const startRecording = async () => {
+    if (busyRef.current || recordingRef.current) return;
+    // Never record the phone reading its own answer
+    stopAnswer();
+    setError(null);
+    let recording: Audio.Recording | null = null;
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
-        Alert.alert("Permission Denied", "Microphone access is required.");
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        setError(permission.canAskAgain ? MIC_ERRORS.denied : MIC_ERRORS.blocked);
         return;
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recording = new Audio.Recording();
+      await recording.prepareToRecordAsync({ ...Audio.RecordingOptionsPresets.HIGH_QUALITY, isMeteringEnabled: true });
+      // Auto-stop: after the farmer has spoken, a pause of SILENCE_MS ends the recording.
+      // Without metering (some devices) only the tap, the release or MAX_RECORDING_MS stops it.
+      // Recordings without speech are never sent: Whisper invents "Thank you for watching" for silence
+      const speech = { metered: false, heard: false };
+      speechRef.current = speech;
+      let lastLoudAt = Date.now();
+      recording.setProgressUpdateInterval(200);
+      recording.setOnRecordingStatusUpdate((status) => {
+        if (!status.isRecording) return;
+        if (status.metering !== undefined) speech.metered = true;
+        if (status.metering !== undefined && status.metering > SPEECH_DB) {
+          speech.heard = true;
+          lastLoudAt = Date.now();
+        }
+        // While the button is held, a pause is just a pause: only the release stops it
+        const holding = pressRef.current !== null;
+        const silentTooLong = !holding && (speech.heard
+          ? Date.now() - lastLoudAt > SILENCE_MS
+          : speech.metered && status.durationMillis > NO_SPEECH_MS);
+        if (silentTooLong || status.durationMillis > MAX_RECORDING_MS) stopRef.current();
+      });
       await recording.startAsync();
       recordingRef.current = recording;
       setIsRecording(true);
     } catch (err) {
-      Alert.alert("Error", "Could not start recording.");
+      console.warn("Could not start recording", err);
+      recording?.stopAndUnloadAsync().catch(() => {});
+      setError(MIC_ERRORS.start);
     }
   };
 
   const stopRecording = async () => {
-    if (!recordingRef.current) return;
+    const recording = recordingRef.current;
+    if (!recording) return;
+    // Cleared first, so a failed stop can never leave a stale recorder behind
+    recordingRef.current = null;
+    recording.setOnRecordingStatusUpdate(null);
     setIsRecording(false);
-    setIsLoading(true);
+
+    let uri: string | null = null;
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-
-      if (!uri) throw new Error("No audio URI");
-
-      // STEP 3: Pass selectedRegion down into your API helper function call
-      const result = await sendVoiceQuery(uri, language, selectedRegion);
-
-      setTranscript(result.transcript);
-      setReply(result.reply);
+      await recording.stopAndUnloadAsync();
+      uri = recording.getURI();
     } catch (err) {
-      Alert.alert("Error", "Could not process your voice query. Please try again.");
+      console.warn("Could not stop recording", err);
+    }
+    if (!uri) {
+      setError(MIC_ERRORS.stop);
+      return;
+    }
+    // Only skipped when the mic level was measured; without metering the backend decides
+    const speech = speechRef.current;
+    if (speech?.metered && !speech.heard) {
+      setError(MIC_ERRORS.noSpeech);
+      return;
+    }
+
+    const audioUri = uri;
+    let answer = "";
+    const answered = await submit(async () => {
+      const result = await sendVoiceQuery(audioUri, language, region);
+      // Whisper was unsure: no answer yet, the farmer confirms or edits the question first
+      const reply = result.needs_confirmation ? null : result.reply;
+      answer = reply?.strategy ?? "";
+      return { question: result.transcript, reply };
+    });
+    // Asked by voice, answered by voice
+    if (answered) startSpeaking(answer);
+  };
+
+  // The auto-stop callback is created when recording starts; this ref lets it call the latest stopRecording
+  const stopRef = useRef(stopRecording);
+  stopRef.current = stopRecording;
+
+  // Tap: starts listening until the farmer goes quiet (or taps again).
+  // Hold: listens while the button is held and stops on release.
+  const pressRef = useRef<{ at: number; started: boolean } | null>(null);
+  const onMicPressIn = () => {
+    if (recordingRef.current) {
+      pressRef.current = { at: Date.now(), started: false };
+      return;
+    }
+    pressRef.current = { at: Date.now(), started: true };
+    startRecording();
+  };
+  const onMicPressOut = () => {
+    const press = pressRef.current;
+    pressRef.current = null;
+    if (!press) return;
+    if (!press.started || Date.now() - press.at >= HOLD_MS) stopRecording();
+  };
+
+  // Runs one request at a time. On failure the previous question and reply stay on screen.
+  // A null reply means the question needs confirming; it returns false and saves nothing.
+  const submit = async (
+    request: () => Promise<{ question: string; reply: AssistantReply | null }>
+  ): Promise<boolean> => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    stopAnswer();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await request();
+      setTranscript(result.question);
+      setConfirming(result.reply === null);
+      answersRef.current = result.reply && { original: result.reply.strategy, byLanguage: { [language]: result.reply.strategy } };
+      setReply(result.reply);
+      setIsEditing(false);
+      if (!result.reply) return false;
+      // A storage failure is logged, never shown as a failed query
+      await appendHistory({ transcript: result.question, reply: result.reply.strategy, language })
+        .catch((err) => console.warn("Could not save query to history", err));
+      return true;
+    } catch (err) {
+      console.warn("Query failed", err);
+      setError(apiErrorMessage(err));
+      return false;
     } finally {
+      busyRef.current = false;
       setIsLoading(false);
     }
   };
 
+  const askText = (message: string) =>
+    submit(async () => {
+      const result = await sendTextQuery(message, language, region);
+      return { question: message, reply: result.analysis };
+    });
+
+  const sendTyped = async () => {
+    const message = typedText.trim();
+    if (!message) return;
+    if (await askText(message)) setTypedText("");
+  };
+
+  const askEdited = async () => {
+    const message = editedText.trim();
+    if (!message) return;
+    await askText(message);
+  };
+
+  // "Yes, ask this": the question was spoken, so the answer is read aloud as well
+  const confirmAsk = async () => {
+    let answer = "";
+    const answered = await submit(async () => {
+      const result = await sendTextQuery(transcript, language, region);
+      answer = result.analysis.strategy;
+      return { question: transcript, reply: result.analysis };
+    });
+    if (answered) startSpeaking(answer);
+  };
+
+  const startEditing = () => {
+    setEditedText(transcript);
+    setIsEditing(true);
+  };
+
+  // Derived from the existing state; no new logic
+  const sendDisabled = isLoading || isRecording || !typedText.trim();
+  const micTone = isRecording ? colors.danger : isLoading ? colors.secondary : colors.primary;
+  const reduceMotion = useReduceMotion();
+  const headerHeight = useHeaderHeight();
+
+  // Ember pulse while listening; a slowly turning arc while processing. Both stop when idle.
+  const pulse = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isRecording || reduceMotion) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.out(Easing.ease), useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isRecording, reduceMotion, pulse]);
+  useEffect(() => {
+    if (!isLoading || reduceMotion) {
+      spin.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [isLoading, reduceMotion, spin]);
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.hint}>
-        {isRecording ? "Magsalita na... (Recording...)" : "I-tap ang mikropono para magtanong"}
-      </Text>
-
-      <LanguagePicker />
-
-      <TouchableOpacity
-        style={[styles.micButton, isRecording && styles.micButtonActive]}
-        onPress={isRecording ? stopRecording : startRecording}
-        disabled={isLoading}
-      >
-        <Ionicons name={isRecording ? "stop" : "mic"} size={64} color="#fff" />
-      </TouchableOpacity>
-
-      {isLoading && <ActivityIndicator size="large" color="#1a7a1a" style={{ marginTop: 24 }} />}
-
-      {transcript !== "" && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Inyong Tanong:</Text>
-          <Text style={styles.cardText}>"{transcript}"</Text>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
+    >
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.contextBar}>
+          <LanguagePicker />
+          <View style={styles.regionRow}>
+            <MaterialCommunityIcons name="map-marker-outline" size={18} color={colors.primary} />
+            <Text style={styles.regionText}>{t("voice.regionLine", { region: regionLabel })}</Text>
+          </View>
         </View>
-      )}
 
-      {/* STEP 4: Render the structured layout results nicely if a reply exists */}
-      {reply && (
-        <View style={[styles.card, styles.replyCard]}>
-          <Text style={styles.cardLabel}>📊 Pagsusuri ng Halaga ({selectedRegion}):</Text>
-
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Halaman / Crop:</Text>
-            <Text style={styles.dataValue}>{reply.extracted_data?.crop}</Text>
+        {error && (
+          <View style={styles.errorPanel}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={22} color={colors.danger} />
+            <Text style={styles.errorText}>
+              {t(error.key, error.values)}
+              {error.typeInstead ? `\n${t("voice.typeInstead")}` : ""}
+            </Text>
           </View>
+        )}
 
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Timbang / Weight:</Text>
-            <Text style={styles.dataValue}>{reply.extracted_data?.weight} kg</Text>
+        {/* Nothing asked yet: example questions show what the assistant can answer */}
+        {transcript === "" && !reply && (
+          <View style={styles.block}>
+            <Text style={styles.label}>{t("voice.tryAsking")}</Text>
+            {SUGGESTIONS.map((key) => (
+              <SuggestionRow key={key} text={t(key)} onPress={() => askText(t(key))} disabled={isLoading || isRecording} />
+            ))}
           </View>
+        )}
 
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Alok ng Kumpra / Middleman Offer:</Text>
-            <Text style={styles.dataValueOffer}>₱{reply.extracted_data?.offer_per_kg} / kg</Text>
+        {transcript !== "" && (
+          <FadeInView style={styles.block}>
+            <Text style={styles.label}>{confirming ? t("voice.didYouMean") : asLabel(t("voice.yourQuestion"))}</Text>
+            {isEditing ? (
+              <>
+                <TextInput
+                  style={[styles.input, styles.editInput]}
+                  value={editedText}
+                  onChangeText={setEditedText}
+                  multiline
+                  autoFocus
+                  editable={!isLoading}
+                  accessibilityLabel={t("voice.yourQuestion")}
+                />
+                <View style={styles.editActions}>
+                  <Button label={t("voice.cancel")} variant="text" onPress={() => setIsEditing(false)} disabled={isLoading} />
+                  <Button label={t("voice.askAgain")} icon="send" onPress={askEdited} disabled={isLoading || !editedText.trim()} />
+                </View>
+              </>
+            ) : (
+              <View style={styles.questionRow}>
+                <Text style={styles.questionText} selectable>"{transcript}"</Text>
+                {confirming ? (
+                  <View style={styles.editActions}>
+                    <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+                    <Button label={t("voice.confirmAsk")} icon="check" onPress={confirmAsk} disabled={isLoading || isRecording} />
+                  </View>
+                ) : (
+                  <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+                )}
+              </View>
+            )}
+          </FadeInView>
+        )}
+
+        {reply && reply.mode === "negotiation" && (
+          <FadeInView index={1} style={styles.block}>
+            <BlockTitle icon="scale-balance" text={t("voice.analysisTitle", { region: regionLabel })} />
+            <View style={styles.board}>
+              <View style={styles.boardHead}>
+                <Text style={styles.boardCrop} accessibilityLabel={`${asLabel(t("voice.crop"))}: ${reply.extracted_data.crop ?? "—"}`}>
+                  {reply.extracted_data.crop ?? "—"}
+                </Text>
+                <Text style={styles.boardWeight} accessibilityLabel={`${asLabel(t("voice.weight"))}: ${formatNumber(reply.extracted_data.weight, " kg")}`}>
+                  {formatNumber(reply.extracted_data.weight, " kg")}
+                </Text>
+              </View>
+              <Text style={styles.boardLabel}>{asLabel(priceLabel(reply, t))}</Text>
+              <PriceText value={reply.fair_price_per_kg} unit="kg" />
+              <View style={styles.boardRule} />
+              <View style={styles.boardRow}>
+                <Text style={styles.boardRowLabel}>{asLabel(t("voice.offer"))}</Text>
+                <PriceText value={reply.extracted_data.offer_per_kg} unit="kg" size="headline" color={colors.danger} />
+              </View>
+              {reply.total_market_value !== null && (
+                <View style={styles.boardRow}>
+                  <Text style={styles.boardRowLabel}>{asLabel(t("voice.totalValue"))}</Text>
+                  <PriceText value={reply.total_market_value} size="headline" color={colors.text} />
+                </View>
+              )}
+            </View>
+          </FadeInView>
+        )}
+
+        {reply && (
+          <FadeInView index={2} style={styles.block}>
+            <BlockTitle
+              icon="lightbulb-on-outline"
+              text={reply.mode === "negotiation" ? t("voice.strategyTitle") : t("voice.adviceTitle")}
+            />
+            <Button
+              label={isSpeaking ? t("voice.stopSpeaking") : t("voice.listen")}
+              icon={isSpeaking ? "stop" : "volume-high"}
+              variant="secondary"
+              onPress={isSpeaking ? stopAnswer : () => startSpeaking(reply.strategy)}
+              disabled={isTranslating}
+              style={styles.listenButton}
+            />
+            <AnswerText text={reply.strategy} />
+          </FadeInView>
+        )}
+      </ScrollView>
+
+      <View style={styles.dock}>
+        <View style={styles.micRow}>
+          <Text style={styles.hint} accessibilityLiveRegion="polite">
+            {isLoading ? t("voice.loading") : isTranslating ? t("voice.translating") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
+          </Text>
+
+          <View style={styles.micWrap}>
+            {isRecording && !reduceMotion && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.pulse,
+                  {
+                    opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+                  },
+                ]}
+              />
+            )}
+            {isLoading && (
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.arc, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] }]}
+              >
+                <Svg width={ARC} height={ARC}>
+                  <Circle cx={ARC / 2} cy={ARC / 2} r={ARC / 2 - 3} stroke={colors.secondary} strokeWidth={3}
+                          strokeDasharray="80 600" strokeLinecap="round" fill="none" />
+                </Svg>
+              </Animated.View>
+            )}
+            <View style={[styles.ring, { borderColor: micTone }]}>
+              <PressableScale
+                style={[styles.mic, { backgroundColor: micTone }]}
+                onPressIn={onMicPressIn}
+                onPressOut={onMicPressOut}
+                disabled={isLoading}
+                // Screen readers can't hold; their activate action toggles recording instead
+                accessibilityActions={[{ name: "activate" }]}
+                onAccessibilityAction={() => (recordingRef.current ? stopRecording() : startRecording())}
+                accessibilityRole="button"
+                accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
+                accessibilityState={{ disabled: isLoading, busy: isLoading }}
+              >
+                <MaterialCommunityIcons
+                  name={isRecording ? "stop" : isLoading ? "dots-horizontal" : "microphone"}
+                  size={44}
+                  color={colors.onPrimary}
+                />
+              </PressableScale>
+            </View>
           </View>
-
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Patas na Presyo (UN-WFP):</Text>
-            <Text style={styles.dataValueFair}>₱{reply.fair_price_per_kg} / kg</Text>
-          </View>
-
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Kabuuang Patas na Halaga:</Text>
-            <Text style={styles.totalValue}>₱{reply.total_market_value?.toLocaleString()}</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.cardLabel}>💡 Diskarte sa Pakikipagtawaran:</Text>
-          <Text style={styles.cardText}>{reply.strategy}</Text>
         </View>
-      )}
-    </ScrollView>
+
+        <View style={styles.typeBar}>
+          <TextInput
+            style={styles.input}
+            placeholder={t("voice.typePlaceholder")}
+            placeholderTextColor={colors.textMuted}
+            value={typedText}
+            onChangeText={setTypedText}
+            multiline
+            editable={!isLoading}
+            accessibilityLabel={t("voice.typePlaceholder")}
+          />
+          <PressableScale
+            style={[styles.sendButton, sendDisabled && styles.disabled]}
+            onPress={sendTyped}
+            disabled={sendDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={t("voice.sendLabel")}
+            accessibilityState={{ disabled: sendDisabled }}
+          >
+            <MaterialCommunityIcons name="send" size={22} color={colors.onPrimary} />
+          </PressableScale>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, alignItems: "center", padding: 24, backgroundColor: "#f5f9f5" },
-  hint: { fontSize: 16, color: "#555", marginBottom: 16, textAlign: "center" },
-  micButton: { width: 140, height: 140, borderRadius: 70, backgroundColor: "#1a7a1a", justifyContent: "center", alignItems: "center", elevation: 8, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8 },
-  micButtonActive: { backgroundColor: "#c0392b" },
-  card: { width: "100%", backgroundColor: "#fff", borderRadius: 12, padding: 16, marginTop: 20, elevation: 3 },
-  replyCard: { borderLeftWidth: 4, borderLeftColor: "#1a7a1a" },
-  cardLabel: { fontWeight: "bold", color: "#1a7a1a", marginBottom: 6 },
-  cardText: { fontSize: 15, color: "#333", lineHeight: 22 },
+// Dictionary labels end with ":" for the old layout; beside a value the colon is dropped
+function asLabel(text: string): string {
+  return text.replace(/:\s*$/, "");
+}
 
-  // New formatting style lines for the data card dashboard display table:
-  dataRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  dataLabel: { fontSize: 14, color: "#666" },
-  dataValue: { fontSize: 14, fontWeight: "bold", color: "#333" },
-  dataValueOffer: { fontSize: 14, fontWeight: "bold", color: "#c0392b" },
-  dataValueFair: { fontSize: 14, fontWeight: "bold", color: "#1a7a1a" },
-  totalValue: { fontSize: 15, fontWeight: "bold", color: "#1a7a1a" },
-  divider: { height: 1, backgroundColor: "#eaeaea", marginVertical: 12 }
-});
+function SuggestionRow({ text, onPress, disabled }: { text: string; onPress: () => void; disabled: boolean }) {
+  return (
+    <PressableScale
+      style={[styles.suggestion, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={text}
+      accessibilityState={{ disabled }}
+    >
+      <MaterialCommunityIcons name="message-text-outline" size={22} color={colors.primary} />
+      <Text style={styles.suggestionText}>{text}</Text>
+    </PressableScale>
+  );
+}
+
+function BlockTitle({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <View style={styles.blockTitleRow}>
+      <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />
+      <Text style={styles.blockTitle} accessibilityRole="header">{text}</Text>
+    </View>
+  );
+}
+
+// Shows the AI's answer exactly as returned. Only lines it starts with "•" are laid out as a
+// list (the bullet becomes a dot beside the text); no words are added, removed or reworded.
+function AnswerText({ text }: { text: string }) {
+  return (
+    <View>
+      {text.split("\n").map((line, i) => {
+        const bullet = /^\s*•\s?/.exec(line);
+        if (bullet) {
+          return (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.answerText} selectable>{line.slice(bullet[0].length)}</Text>
+            </View>
+          );
+        }
+        return line.trim() === ""
+          ? <View key={i} style={styles.paragraphGap} />
+          : <Text key={i} style={styles.answerText} selectable>{line}</Text>;
+      })}
+    </View>
+  );
+}
+
+function formatNumber(value: number | null, suffix = ""): string {
+  return value === null ? "—" : `${value.toLocaleString()}${suffix}`;
+}
+
+// Only call a price "UN-WFP" when the backend actually found one
+function priceLabel(reply: AssistantReply, t: Translate): string {
+  switch (reply.price_status) {
+    case "matched_region":
+      return t("voice.priceMatched");
+    case "other_region":
+      // The region name comes from the backend and is not translated
+      return t("voice.priceOtherRegion", { region: reply.price_region ?? "—" });
+    case "unverified_legacy":
+      return t("voice.priceLegacy");
+    default:
+      return t("voice.priceNone");
+  }
+}
+
+const styles = themed(() => StyleSheet.create({
+  screen:        { flex: 1, backgroundColor: colors.background },
+  scroll:        { flex: 1 },
+  container:     { flexGrow: 1, padding: spacing.lg, gap: spacing.xl },
+
+  contextBar:    { gap: spacing.sm },
+  regionRow:     { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  regionText:    { ...type.caption, color: colors.textSecondary, flexShrink: 1 },
+
+  suggestion:    { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg,
+                   paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: colors.card,
+                   borderWidth: 1, borderColor: colors.glassBorder },
+  suggestionText: { ...type.body, color: colors.text, flex: 1 },
+  listenButton:  { alignSelf: "flex-start" },
+
+  errorPanel:    { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md,
+                   borderRadius: radius.sm, backgroundColor: colors.dangerBg },
+  errorText:     { ...type.body, color: colors.danger, flex: 1 },
+
+  block:         { gap: spacing.sm },
+  label:         { ...type.overline, color: colors.textSecondary },
+  questionRow:   { gap: spacing.xs },
+  questionText:  { ...type.bodyLarge, color: colors.text },
+  editInput:     { flex: 0 },
+  editActions:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.sm },
+
+  blockTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  blockTitle:    { ...type.body, fontFamily: fonts.bold, color: colors.text, flex: 1 },
+
+  // The price board: one placard per answer, edged in earth like a cardboard sign
+  board:         { padding: spacing.lg, borderRadius: radius.sm, backgroundColor: colors.card,
+                   borderWidth: 2, borderColor: colors.earth, gap: spacing.xs },
+  boardHead:     { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.md,
+                   marginBottom: spacing.sm },
+  boardCrop:     { ...type.headline, color: colors.text, flexShrink: 1 },
+  boardWeight:   { ...type.body, color: colors.textSecondary },
+  boardLabel:    { ...type.overline, color: colors.textSecondary },
+  boardRule:     { height: 1, backgroundColor: colors.earth, marginVertical: spacing.md },
+  boardRow:      { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: spacing.sm },
+  boardRowLabel: { ...type.body, color: colors.textSecondary, flexShrink: 1 },
+
+  answerText:    { ...type.bodyLarge, color: colors.text, flex: 1 },
+  bulletRow:     { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xs },
+  bulletDot:     { ...type.bodyLarge, fontFamily: fonts.bold, color: colors.primary },
+  paragraphGap:  { height: spacing.md },
+
+  // Fixed controls under the scrolling answer
+  dock:          { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+                   paddingBottom: spacing.md, borderTopWidth: 1, borderTopColor: colors.divider },
+  micRow:        { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  hint:          { ...type.body, fontFamily: fonts.bold, color: colors.text, flex: 1 },
+  micWrap:       { width: ARC, height: ARC, alignItems: "center", justifyContent: "center" },
+  pulse:         { position: "absolute", width: RING, height: RING, borderRadius: RING / 2, backgroundColor: colors.danger },
+  arc:           { position: "absolute", width: ARC, height: ARC },
+  ring:          { width: RING, height: RING, borderRadius: RING / 2, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  mic:           { width: MIC, height: MIC, borderRadius: MIC / 2, alignItems: "center", justifyContent: "center",
+                   borderTopWidth: 1, borderTopColor: colors.sheen },
+
+  typeBar:       { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
+  input:         { flex: 1, minHeight: 52, maxHeight: 120, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+                   borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+                   ...type.body, color: colors.text },
+  sendButton:    { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  disabled:      { opacity: 0.45 },
+}));

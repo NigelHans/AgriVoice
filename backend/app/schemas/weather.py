@@ -4,11 +4,11 @@ from pydantic import BaseModel
 
 class DailyForecast(BaseModel):
     date: str
-    temp_max: float
-    temp_min: float
-    rain_probability: int   # 0–100 %
-    wind_speed: float       # km/h
-    weather_code: int       # WMO weather code
+    temp_max: float | None
+    temp_min: float | None
+    rain_probability: int | None  # 0–100 %
+    wind_speed: float | None     # km/h
+    weather_code: int | None     # WMO weather code
 
 
 class WeatherForecast(BaseModel):

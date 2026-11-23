@@ -1,27 +1,37 @@
 -- AgriVoice — Supabase Schema
--- Run this SQL in your Supabase SQL Editor to set up all tables.
+-- Run this SQL in your Supabase SQL Editor to set up all tables in a NEW project.
+-- Existing projects: do not run this against an existing market_prices table;
+-- use database/migrations/ instead.
 
 -- ============================================================
 -- TABLE: market_prices
--- Stores daily crop prices synced from DA/BAI public data.
+-- Stores monthly crop prices synced from UN-WFP public data.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS market_prices (
-    id            BIGSERIAL PRIMARY KEY,
-    crop_name     TEXT NOT NULL,           -- e.g. "Palay (Special)", "White Corn"
-    region        TEXT NOT NULL,           -- e.g. "Region X", "Davao Region"
-    province      TEXT,
-    municipality  TEXT,
-    price_per_kg  NUMERIC(10, 2) NOT NULL, -- prevailing farmgate price
-    unit          TEXT DEFAULT 'kg',
-    price_date    DATE NOT NULL,
-    source        TEXT DEFAULT 'DA-AMAD',  -- data source
-    created_at    TIMESTAMPTZ DEFAULT NOW()
+    id                 BIGSERIAL PRIMARY KEY,
+    crop_name          TEXT NOT NULL,            -- e.g. "Onion", "Tomato", "Rice"
+    region             TEXT NOT NULL,            -- e.g. "Region X", "National Capital region"
+    province           TEXT,
+    municipality       TEXT,
+    price_per_kg       NUMERIC(10, 2) NOT NULL,  -- recorded market price
+    fair_price_per_kg  NUMERIC,                  -- legacy mirror of price_per_kg (written by the sync)
+    unit               TEXT DEFAULT 'kg',
+    price_date         DATE NOT NULL,            -- source report date
+    source             TEXT DEFAULT 'DA-AMAD',   -- data source
+    is_legacy          BOOLEAN NOT NULL DEFAULT false, -- true: price_date is a sync date, not a report date
+    updated_at         TIMESTAMPTZ,              -- when the row was last synced
+    created_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Index for fast daily lookups
 CREATE INDEX IF NOT EXISTS idx_market_prices_date  ON market_prices (price_date);
 CREATE INDEX IF NOT EXISTS idx_market_prices_crop  ON market_prices (crop_name);
 CREATE INDEX IF NOT EXISTS idx_market_prices_region ON market_prices (region);
+
+-- One price per crop/region/date; the price sync upserts on these columns.
+-- Existing databases: see migrations/001_market_prices_standardize.sql
+CREATE UNIQUE INDEX IF NOT EXISTS uq_market_prices_crop_region_date
+    ON market_prices (crop_name, region, price_date);
 
 -- ============================================================
 -- TABLE: conversations

@@ -37,7 +37,7 @@ import PressableScale from "../components/PressableScale";
 import PriceText from "../components/PriceText";
 import { useReduceMotion } from "../components/motion";
 import { appendHistory } from "../services/historyStorage";
-import { speak, stopSpeaking } from "../services/speech";
+import { hasFilipinoVoice, speak, stopSpeaking } from "../services/speech";
 import type { AssistantReply } from "../types";
 import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
@@ -117,6 +117,9 @@ export default function VoiceScreen() {
     const current = () => readingRef.current === reading;
     speak(text, lang, () => { if (current()) setIsSpeaking(false); }, current);
   };
+  // No Filipino voice on the phone: a hint under Listen explains how to install one
+  const [missingVoice, setMissingVoice] = useState(false);
+  useEffect(() => { hasFilipinoVoice().then((has) => setMissingVoice(!has)); }, []);
   const stopAnswer = () => {
     readingRef.current++;
     setIsSpeaking(false);
@@ -509,6 +512,9 @@ export default function VoiceScreen() {
               disabled={isTranslating}
               style={styles.listenButton}
             />
+            {missingVoice && answerLang !== "en" && (
+              <Text style={styles.regionText}>{t("voice.installFilipinoVoice")}</Text>
+            )}
             <AnswerText text={reply.strategy} />
           </FadeInView>
         )}

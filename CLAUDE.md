@@ -20,7 +20,7 @@ Set `PRICE_SYNC_ON_STARTUP=false` in `backend/.env` to stop the server from writ
 
 Mobile (run from `mobile/`): `npm install`, then `npx expo start`. Set `EXPO_PUBLIC_BACKEND_URL` in `mobile/.env` to the dev machine's LAN IP. Without it the app falls back to `localhost:8000`.
 
-The root `package.json`, `playwright.config.ts` and `tests/example.spec.ts` are leftover Playwright scaffolding, and the GitHub workflow runs only them. The real tests are the backend pytest suite.
+CI (`.github/workflows/ci.yml`) runs the backend pytest suite, plus `tsc --noEmit` and an Android `expo export` bundle for the mobile app.
 
 ## Backend architecture
 
@@ -34,8 +34,8 @@ The root `package.json`, `playwright.config.ts` and `tests/example.spec.ts` are 
 ## Database and migrations
 
 - `backend/database/schema.sql` is the intended schema. `inspect_market_prices.sql` holds read-only inspection queries.
-- Migrations in `backend/database/migrations/` are applied **by hand in the Supabase SQL Editor**; there is no migration tool. Each script runs in a single transaction and aborts if any check fails. Each migration comes with a rollback script, a recovery script or a read-only `*_checks.sql`. `001_rollback_and_recovery.md` gives the rollout order: inspect, migrate, re-inspect, then deploy the backend.
-- Migration 002 (proposed) makes `market_prices` read-only for the `anon` and `authenticated` roles. The backend writes with the service_role key.
+- Migrations in `backend/database/migrations/` are applied **by hand** by the user, either in the Supabase SQL Editor or with `backend/database/migrate.sh` (psql; it asks before each change and logs to `migration-logs/`). Each script runs in a single transaction and aborts if any check fails. Each migration comes with a rollback script, a recovery script or a read-only `*_checks.sql`. `001_rollback_and_recovery.md` gives the rollout order: inspect, migrate, re-inspect, then deploy the backend.
+- Migrations 001 and 002 are applied on the live project (verified 2026-11-23: 714 rows). 002 makes `market_prices` read-only for the `anon` and `authenticated` roles. The backend writes with the service_role key.
 - Database audits and migration reviews are **read-only**: never connect to the live database or run migrations. Write and review the SQL, and the user applies it.
 
 ## Mobile

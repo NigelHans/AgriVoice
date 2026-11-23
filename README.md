@@ -31,7 +31,7 @@ AgriVoice/
 
 ### Prerequisites
 - Node.js 18+ and npm/yarn
-- Python 3.14+
+- Python 3.12+
 - Expo Go app on your phone (no global Expo CLI needed; `npx expo` is used)
 - Groq API key (https://console.groq.com)
 - Supabase project (https://supabase.com)
@@ -52,7 +52,7 @@ Fill in `backend/.env`:
 - Optional: `PRICE_SYNC_ON_STARTUP=false` stops the server from writing prices to Supabase on every start.
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python run.py                # same as: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 Check that it is running at http://localhost:8000/docs.
 
@@ -79,7 +79,7 @@ Scan the QR code with the **Expo Go** app on your phone.
 ### Troubleshooting
 - **Phone can't reach the backend:** the phone and computer must be on the same Wi-Fi, the firewall must allow port 8000, and the backend must run with `--host 0.0.0.0`.
 - **`.env` changes ignored:** restart Expo with `npx expo start -c`.
-- The root `package.json`, `playwright.config.ts` and the GitHub workflow are leftover Playwright scaffolding; you can ignore them.
+- **Prices return 502:** the database migrations have not been applied yet. See `backend/database/migrations/001_rollback_and_recovery.md`.
 
 ---
 

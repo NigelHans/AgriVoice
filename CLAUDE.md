@@ -41,4 +41,4 @@ CI (`.github/workflows/ci.yml`) runs the backend pytest suite, plus `tsc --noEmi
 
 ## Mobile
 
-`src/App.tsx` sets up bottom-tab navigation across the Voice, Market, Weather, History and Settings screens. All HTTP calls go through `src/services/api.ts` (axios). `LanguageContext` stores the selected language (`fil`, `ceb`, `ilo` or `en`). Chat history is saved on the device with AsyncStorage.
+`src/App.tsx` sets up bottom-tab navigation across the Voice, Market, Weather, History and Settings screens. All HTTP calls go through `src/services/api.ts` (axios). The weather forecast is fetched from Open-Meteo directly by the phone (the hosted backend's shared IP gets 429 from Open-Meteo's free tier), with `/api/v1/weather/forecast` as the fallback. `LanguageContext` stores the selected language (`fil`, `ceb`, `ilo` or `en`). Chat history is saved on the device with AsyncStorage.

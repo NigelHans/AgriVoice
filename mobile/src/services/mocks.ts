@@ -57,6 +57,11 @@ export async function sendTextQuery(message: string, language: string, location:
   return { reply: analysis.strategy, analysis };
 }
 
+export async function translateText(text: string, language: string): Promise<string> {
+  await wait();
+  return `[${language}] ${text.replace(/^\[\w+\] /, "")}`;
+}
+
 const price = (crop_name: string, region: string, price_per_kg: number, price_date: string, is_legacy = false): CropPrice => ({
   id: null,
   crop_name,

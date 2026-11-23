@@ -53,6 +53,13 @@ export async function sendTextQuery(
   return response.data;
 }
 
+/** Translates an answer already on screen into the newly selected language. */
+export async function translateText(text: string, language: string): Promise<string> {
+  if (USE_MOCKS) return mocks.translateText(text, language);
+  const response = await api.post("/api/v1/chat/translate", { text, language });
+  return response.data.text;
+}
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { loadHistory, deleteHistoryEntry, clearHistory } from "../services/historyStorage";
 import { LANGUAGES, useLanguage, type LanguageCode } from "../context/LanguageContext";
 import { speak, stopSpeaking } from "../services/speech";
+import { translateText } from "../services/api";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useT, type StringKey, type Translate } from "../i18n";
 import type { HistoryEntry } from "../types";
@@ -20,6 +21,10 @@ import PressableScale from "../components/PressableScale";
 import { colors, spacing, radius, type, fonts, themed } from "../theme";
 
 type Status = "loading" | "ready" | "unreadable";
+
+// Saved answers translated this session, keyed by language and answer text (entry ids can shift).
+// shortcut: memory only, so reopening the app translates again; store them if that gets costly.
+const translations = new Map<string, string>();
 
 export default function HistoryScreen() {
   const t = useT();
@@ -215,10 +220,37 @@ function DetailSheet({ entry, onClose, onDelete, onAskAgain, actionError, t }: {
     const current = () => readingRef.current === reading;
     const saved = LANGUAGES.find((l) => l.code === item.language)?.code as LanguageCode | undefined;
     setIsSpeaking(true);
-    speak(item.reply, saved ?? language, () => { if (current()) setIsSpeaking(false); }, current);
+    const text = translated ?? item.reply;
+    speak(text, translated !== null ? language : saved ?? language, () => { if (current()) setIsSpeaking(false); }, current);
   };
-  // Closing the sheet, switching entries or leaving the tab stops the reading
-  useEffect(() => stopAnswer, [entry?.id]);
+  // An answer saved in another language is shown translated into the current one;
+  // if translation fails, the original stays on screen
+  const [translated, setTranslated] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  useEffect(() => {
+    if (!entry) return;   // keep the last text while the sheet slides away
+    setTranslated(null);
+    if (!entry.reply || entry.language === language) return;
+    const key = `${language}\n${entry.reply}`;
+    const cached = translations.get(key);
+    if (cached !== undefined) {
+      setTranslated(cached);
+      return;
+    }
+    let cancelled = false;
+    setIsTranslating(true);
+    translateText(entry.reply, language)
+      .then((text) => {
+        translations.set(key, text);
+        if (!cancelled) setTranslated(text);
+      })
+      .catch((err) => console.warn("Could not translate saved answer", err))
+      .finally(() => { if (!cancelled) setIsTranslating(false); });
+    return () => { cancelled = true; setIsTranslating(false); };
+  }, [entry?.id, language]);
+
+  // Closing the sheet, switching entries, a language change or leaving the tab stops the reading
+  useEffect(() => stopAnswer, [entry?.id, language]);
   useFocusEffect(useCallback(() => () => stopAnswer(), []));
 
   return (
@@ -238,7 +270,8 @@ function DetailSheet({ entry, onClose, onDelete, onAskAgain, actionError, t }: {
             </View>
             <View style={styles.detailBlock}>
               <DetailTitle icon="lightbulb-on-outline" text={t("history.answer")} />
-              <Text style={styles.detailText} selectable>{shown.reply || "—"}</Text>
+              {isTranslating && <Text style={styles.time}>{t("voice.translating")}</Text>}
+              <Text style={styles.detailText} selectable>{translated ?? (shown.reply || "—")}</Text>
             </View>
             <View style={styles.sheetActions}>
               {shown.reply !== "" && (
@@ -247,6 +280,7 @@ function DetailSheet({ entry, onClose, onDelete, onAskAgain, actionError, t }: {
                   icon={isSpeaking ? "stop" : "volume-high"}
                   variant="secondary"
                   onPress={isSpeaking ? stopAnswer : () => startSpeaking(shown)}
+                  disabled={isTranslating}
                 />
               )}
               {shown.transcript !== "" && (

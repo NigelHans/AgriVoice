@@ -27,9 +27,9 @@ import { Audio } from "expo-av";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { sendVoiceQuery, sendTextQuery } from "../services/api";
+import { sendVoiceQuery, sendTextQuery, translateText } from "../services/api";
 import { useT, apiErrorMessage, type Translate, type UiMessage } from "../i18n";
-import { useLanguage } from "../context/LanguageContext";
+import { useLanguage, type LanguageCode } from "../context/LanguageContext";
 import { useRegion, getRegionLabel } from "../context/RegionContext";
 import LanguagePicker from "../components/LanguagePicker";
 import Button from "../components/Button";
@@ -47,6 +47,13 @@ type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 const MIC = 96;           // microphone disc (bottom right, within thumb reach)
 const RING = MIC + 16;    // leaf / ember ring around it
 const ARC = RING + 16;    // processing arc
+
+// Recording. shortcut: SPEECH_DB and SILENCE_MS are first guesses (mic levels differ per phone);
+// tune them on real phones outdoors if recordings stop too early or never stop.
+const SPEECH_DB = -40;            // louder than this (dBFS) counts as speaking
+const SILENCE_MS = 1500;          // pause after speaking that ends a tapped recording
+const MAX_RECORDING_MS = 60_000;  // hard stop
+const HOLD_MS = 500;              // a press at least this long is hold-to-talk: release stops
 
 // Example questions for a first-time user; tapping one asks it
 const SUGGESTIONS = ["voice.suggestPrice", "voice.suggestOffer", "voice.suggestPest"] as const;
@@ -75,6 +82,8 @@ export default function VoiceScreen() {
   const [typedText, setTypedText] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState("");
+  // The spoken question may be misheard and has no answer yet ("Did you mean…?")
+  const [confirming, setConfirming] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   // Synchronous guard: state updates are async, so a fast double tap could slip past isLoading
@@ -106,6 +115,36 @@ export default function VoiceScreen() {
     stopSpeaking();
   };
 
+  // The current answer in each language it has been shown in, so switching back needs no new request.
+  // A new answer replaces the object, so a translation that finishes late can't overwrite it.
+  const answersRef = useRef<{ original: string; byLanguage: Partial<Record<LanguageCode, string>> } | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  useEffect(() => {
+    const answers = answersRef.current;
+    if (!reply || !answers) return;
+    const show = (text: string) => setReply((r) => (r && answersRef.current === answers ? { ...r, strategy: text } : r));
+    stopAnswer();
+    const cached = answers.byLanguage[language];
+    if (cached !== undefined) {
+      show(cached);
+      return;
+    }
+    let cancelled = false;
+    setIsTranslating(true);
+    setError(null);
+    translateText(answers.original, language)
+      .then((text) => {
+        answers.byLanguage[language] = text;
+        if (!cancelled) show(text);
+      })
+      .catch((err) => {
+        console.warn("Translation failed", err);
+        if (!cancelled) setError(apiErrorMessage(err));
+      })
+      .finally(() => { if (!cancelled) setIsTranslating(false); });
+    return () => { cancelled = true; setIsTranslating(false); };
+  }, [language]);
+
   // Leaving the tab (or unmounting) mid-recording discards the recording and releases the mic
   useFocusEffect(useCallback(() => () => {
     const recording = recordingRef.current;
@@ -130,7 +169,23 @@ export default function VoiceScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
       recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.prepareToRecordAsync({ ...Audio.RecordingOptionsPresets.HIGH_QUALITY, isMeteringEnabled: true });
+      // Auto-stop: after the farmer has spoken, a pause of SILENCE_MS ends the recording.
+      // Without metering (some devices) only the tap, the release or MAX_RECORDING_MS stops it.
+      let heardSpeech = false;
+      let lastLoudAt = Date.now();
+      recording.setProgressUpdateInterval(200);
+      recording.setOnRecordingStatusUpdate((status) => {
+        if (!status.isRecording) return;
+        if (status.metering !== undefined && status.metering > SPEECH_DB) {
+          heardSpeech = true;
+          lastLoudAt = Date.now();
+        }
+        // While the button is held, a pause is just a pause: only the release stops it
+        const holding = pressRef.current !== null;
+        const silentTooLong = !holding && heardSpeech && Date.now() - lastLoudAt > SILENCE_MS;
+        if (silentTooLong || status.durationMillis > MAX_RECORDING_MS) stopRef.current();
+      });
       await recording.startAsync();
       recordingRef.current = recording;
       setIsRecording(true);
@@ -146,6 +201,7 @@ export default function VoiceScreen() {
     if (!recording) return;
     // Cleared first, so a failed stop can never leave a stale recorder behind
     recordingRef.current = null;
+    recording.setOnRecordingStatusUpdate(null);
     setIsRecording(false);
 
     let uri: string | null = null;
@@ -164,16 +220,41 @@ export default function VoiceScreen() {
     let answer = "";
     const answered = await submit(async () => {
       const result = await sendVoiceQuery(audioUri, language, region);
-      answer = result.reply.strategy;
-      return { question: result.transcript, reply: result.reply };
+      // Whisper was unsure: no answer yet, the farmer confirms or edits the question first
+      const reply = result.needs_confirmation ? null : result.reply;
+      answer = reply?.strategy ?? "";
+      return { question: result.transcript, reply };
     });
     // Asked by voice, answered by voice
     if (answered) startSpeaking(answer);
   };
 
+  // The auto-stop callback is created when recording starts; this ref lets it call the latest stopRecording
+  const stopRef = useRef(stopRecording);
+  stopRef.current = stopRecording;
+
+  // Tap: starts listening until the farmer goes quiet (or taps again).
+  // Hold: listens while the button is held and stops on release.
+  const pressRef = useRef<{ at: number; started: boolean } | null>(null);
+  const onMicPressIn = () => {
+    if (recordingRef.current) {
+      pressRef.current = { at: Date.now(), started: false };
+      return;
+    }
+    pressRef.current = { at: Date.now(), started: true };
+    startRecording();
+  };
+  const onMicPressOut = () => {
+    const press = pressRef.current;
+    pressRef.current = null;
+    if (!press) return;
+    if (!press.started || Date.now() - press.at >= HOLD_MS) stopRecording();
+  };
+
   // Runs one request at a time. On failure the previous question and reply stay on screen.
+  // A null reply means the question needs confirming; it returns false and saves nothing.
   const submit = async (
-    request: () => Promise<{ question: string; reply: AssistantReply }>
+    request: () => Promise<{ question: string; reply: AssistantReply | null }>
   ): Promise<boolean> => {
     if (busyRef.current) return false;
     busyRef.current = true;
@@ -183,8 +264,11 @@ export default function VoiceScreen() {
     try {
       const result = await request();
       setTranscript(result.question);
+      setConfirming(result.reply === null);
+      answersRef.current = result.reply && { original: result.reply.strategy, byLanguage: { [language]: result.reply.strategy } };
       setReply(result.reply);
       setIsEditing(false);
+      if (!result.reply) return false;
       // A storage failure is logged, never shown as a failed query
       await appendHistory({ transcript: result.question, reply: result.reply.strategy, language })
         .catch((err) => console.warn("Could not save query to history", err));
@@ -215,6 +299,17 @@ export default function VoiceScreen() {
     const message = editedText.trim();
     if (!message) return;
     await askText(message);
+  };
+
+  // "Yes, ask this": the question was spoken, so the answer is read aloud as well
+  const confirmAsk = async () => {
+    let answer = "";
+    const answered = await submit(async () => {
+      const result = await sendTextQuery(transcript, language, region);
+      answer = result.analysis.strategy;
+      return { question: transcript, reply: result.analysis };
+    });
+    if (answered) startSpeaking(answer);
   };
 
   const startEditing = () => {
@@ -289,7 +384,7 @@ export default function VoiceScreen() {
 
         {transcript !== "" && (
           <FadeInView style={styles.block}>
-            <Text style={styles.label}>{asLabel(t("voice.yourQuestion"))}</Text>
+            <Text style={styles.label}>{confirming ? t("voice.didYouMean") : asLabel(t("voice.yourQuestion"))}</Text>
             {isEditing ? (
               <>
                 <TextInput
@@ -309,7 +404,14 @@ export default function VoiceScreen() {
             ) : (
               <View style={styles.questionRow}>
                 <Text style={styles.questionText} selectable>"{transcript}"</Text>
-                <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+                {confirming ? (
+                  <View style={styles.editActions}>
+                    <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+                    <Button label={t("voice.confirmAsk")} icon="check" onPress={confirmAsk} disabled={isLoading || isRecording} />
+                  </View>
+                ) : (
+                  <Button label={t("voice.edit")} variant="text" icon="pencil-outline" onPress={startEditing} disabled={isLoading} />
+                )}
               </View>
             )}
           </FadeInView>
@@ -355,6 +457,7 @@ export default function VoiceScreen() {
               icon={isSpeaking ? "stop" : "volume-high"}
               variant="secondary"
               onPress={isSpeaking ? stopAnswer : () => startSpeaking(reply.strategy)}
+              disabled={isTranslating}
               style={styles.listenButton}
             />
             <AnswerText text={reply.strategy} />
@@ -365,7 +468,7 @@ export default function VoiceScreen() {
       <View style={styles.dock}>
         <View style={styles.micRow}>
           <Text style={styles.hint} accessibilityLiveRegion="polite">
-            {isLoading ? t("voice.loading") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
+            {isLoading ? t("voice.loading") : isTranslating ? t("voice.translating") : isRecording ? t("voice.hintRecording") : t("voice.hintIdle")}
           </Text>
 
           <View style={styles.micWrap}>
@@ -395,8 +498,12 @@ export default function VoiceScreen() {
             <View style={[styles.ring, { borderColor: micTone }]}>
               <PressableScale
                 style={[styles.mic, { backgroundColor: micTone }]}
-                onPress={isRecording ? stopRecording : startRecording}
+                onPressIn={onMicPressIn}
+                onPressOut={onMicPressOut}
                 disabled={isLoading}
+                // Screen readers can't hold; their activate action toggles recording instead
+                accessibilityActions={[{ name: "activate" }]}
+                onAccessibilityAction={() => (recordingRef.current ? stopRecording() : startRecording())}
                 accessibilityRole="button"
                 accessibilityLabel={isRecording ? t("voice.micStopLabel") : t("voice.micStartLabel")}
                 accessibilityState={{ disabled: isLoading, busy: isLoading }}

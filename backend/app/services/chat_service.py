@@ -43,7 +43,9 @@ Respond with a JSON object only, using exactly these keys:
   "crop": English singular crop name (e.g. "Onion", "Tomato", "Rice"), or null if no crop is mentioned
   "weight_kg": total harvest weight in kilograms as a number, or null if not stated
   "offer_per_kg": the buyer's offered price in pesos per kilogram as a number, or null if not stated
-Never guess numbers that the farmer did not say."""
+Never guess numbers that the farmer did not say.
+The message may come from speech recognition, so a word can be misheard (e.g. "sibuyas" as "si buyas"):
+read it in context and pick the crop the farmer clearly means."""
 
 
 class QueryExtraction(BaseModel):
@@ -86,6 +88,13 @@ class PriceLookup(BaseModel):
 
 def _language_name(language: str) -> str:
     return LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["fil"])
+
+
+def _language_rule(language: str) -> str:
+    # Without this the model mirrors the language of the question or the history (often English)
+    name = _language_name(language)
+    return (f"Reply in {name}. Write the whole reply in {name}, even if the farmer's message or earlier "
+            f"replies are in another language.")
 
 
 REPLY_MAX_TOKENS = 1024   # gpt-oss counts its hidden reasoning against this; 512 cut answers off mid-sentence
@@ -232,11 +241,12 @@ A farmer in {location or 'the Philippines'} has {weight_text} of {crop}. A buyer
 {_price_facts(crop, location, price)}
 Note: recorded prices are retail; farmgate prices are normally lower, so judge fairness realistically.
 
-Write a concise reply in {_language_name(language)}. If an offer and a verified price are both known, say clearly
+Write a concise reply. If an offer and a verified price are both known, say clearly
 whether the offer looks fair or underpriced. Suggest a realistic counter-offer goal only when it can be based on
 the figures above, and give 2 short, practical lines the farmer can say out loud to bargain.
 Keep it conversational, encouraging, and actionable.
-{PLAIN_TEXT_RULE}"""
+{PLAIN_TEXT_RULE}
+{_language_rule(language)}"""
 
     strategy = await _complete(
         settings.GROQ_LLM_MODEL,
@@ -277,12 +287,15 @@ async def _advice_reply(
 The farmer is in {location or 'the Philippines'}. Give practical, accurate advice on crops, planting, pests,
 soil, weather and farm practices suited to Philippine conditions. Keep answers concise and easy to follow.
 If you are not sure, say so and suggest contacting the local Municipal Agriculture Office.
-Reply in {_language_name(language)}.
-{PLAIN_TEXT_RULE}"""
+The farmer's message may come from speech recognition and contain misheard words; read it in context.
+{PLAIN_TEXT_RULE}
+{_language_rule(language)}"""
 
     answer = await _complete(
         settings.GROQ_LLM_MODEL,
-        [{"role": "system", "content": system_prompt}, *_clean_history(history), {"role": "user", "content": message}],
+        # The rule is repeated last so earlier replies in another language don't override it
+        [{"role": "system", "content": system_prompt}, *_clean_history(history), {"role": "user", "content": message},
+         {"role": "system", "content": _language_rule(language)}],
         max_tokens=REPLY_MAX_TOKENS,
         temperature=0.4,
     )
@@ -293,6 +306,22 @@ Reply in {_language_name(language)}.
         price_status="not_applicable",
         strategy=plain_text(answer),
     )
+
+
+async def translate_text(text: str, language: str) -> str:
+    """Translate an earlier answer into another language, keeping figures and list layout."""
+    name = _language_name(language)
+    system_prompt = f"""Translate the user's text, an answer from a farming assistant for a farmer in the Philippines,
+into {name}. Keep every number, peso amount, unit, crop name and place name exactly as written.
+Keep the line breaks and the lines starting with "• ". Output only the translation, nothing else.
+{PLAIN_TEXT_RULE}"""
+    translation = await _complete(
+        settings.GROQ_LLM_MODEL,
+        [{"role": "system", "content": system_prompt}, {"role": "user", "content": text}],
+        max_tokens=REPLY_MAX_TOKENS * 2,   # the answer itself can be up to REPLY_MAX_TOKENS long
+        temperature=0.2,
+    )
+    return plain_text(translation)
 
 
 async def get_ai_response(

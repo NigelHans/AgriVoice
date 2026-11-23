@@ -60,7 +60,9 @@ export interface AssistantReply {
 
 export interface VoiceResponse {
   transcript: string;
-  reply: AssistantReply;
+  /** null when needs_confirmation: the app asks "Did you mean…?" first */
+  reply: AssistantReply | null;
+  needs_confirmation?: boolean;
 }
 
 /** POST /chat/ask — `reply` is the plain-text answer, `analysis` the full structured reply. */

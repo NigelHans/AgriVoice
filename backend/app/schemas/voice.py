@@ -31,4 +31,6 @@ class AssistantReply(BaseModel):
 
 class VoiceResponse(BaseModel):
     transcript: str
-    reply: AssistantReply
+    # No reply when needs_confirmation: the app asks "Did you mean…?" and sends the confirmed text to /chat/ask
+    reply: AssistantReply | None = None
+    needs_confirmation: bool = False

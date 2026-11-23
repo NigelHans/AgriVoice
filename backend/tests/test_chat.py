@@ -45,7 +45,20 @@ def test_general_question_passes_cleaned_history_and_language(client, fake_groq,
 
     messages = groq_fake.chat_calls[1]["messages"]
     assert "Reply in English" in messages[0]["content"]
-    assert messages[1:] == [{"role": "user", "content": "Hi"}, {"role": "user", "content": "Soil tips?"}]
+    assert messages[1:-1] == [{"role": "user", "content": "Hi"}, {"role": "user", "content": "Soil tips?"}]
+    assert messages[-1]["role"] == "system" and "Reply in English" in messages[-1]["content"]
+
+
+def test_both_reply_prompts_use_selected_language(client, fake_groq, fake_supabase):
+    advice = fake_groq(chat_replies=[extraction(intent="general"), "Gamita ang compost."])
+    fake_supabase()
+    client.post("/api/v1/chat/ask", json={"message": "Soil tips?", "language": "ceb"})
+    assert "Write the whole reply in Cebuano" in advice.chat_calls[1]["messages"][-1]["content"]
+
+    negotiation = fake_groq(chat_replies=[extraction(intent="negotiation", crop="onion", weight_kg=100, offer_per_kg=60), "Barato"])
+    fake_supabase(respond=lambda filters: [ONION_NCR])
+    client.post("/api/v1/chat/ask", json={"message": "100 kilo sibuyas, 60 piso alok", "language": "ilo"})
+    assert "Write the whole reply in Ilocano" in negotiation.chat_calls[1]["messages"][0]["content"]
 
 
 
@@ -208,3 +221,17 @@ def test_gpt_oss_models_get_low_reasoning_effort(client, fake_groq, fake_supabas
     response = client.post("/api/v1/chat/ask", json={"message": "Soil tips?"})
     assert response.json()["reply"] == "Use compost."
     assert groq_fake.chat_calls[1]["reasoning_effort"] == "low"
+
+
+def test_translate_returns_plain_text_in_target_language(client, fake_groq):
+    groq_fake = fake_groq(chat_replies=["- Gamita ang **compost**."])
+    response = client.post("/api/v1/chat/translate", json={"text": "• Use compost.", "language": "ceb"})
+    assert response.status_code == 200
+    assert response.json() == {"text": "• Gamita ang compost."}
+    assert "into Cebuano" in groq_fake.chat_calls[0]["messages"][0]["content"]
+    assert groq_fake.chat_calls[0]["messages"][1] == {"role": "user", "content": "• Use compost."}
+
+
+def test_translate_rejects_unknown_language(client, fake_groq):
+    fake_groq()
+    assert client.post("/api/v1/chat/translate", json={"text": "Hi", "language": "xx"}).status_code == 422

@@ -1,0 +1,22 @@
+# Render blueprint for the AgriVoice backend (Render dashboard -> New -> Blueprint -> this repo).
+# Secrets are entered in the Render dashboard when the blueprint is created; never put them here.
+services:
+  - type: web
+    name: agrivoice-backend
+    runtime: python
+    plan: free            # sleeps after 15 min idle; the first request after that takes ~1 min
+    rootDir: backend
+    branch: main
+    autoDeploy: true      # every merge to main redeploys
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3     # same as the dev venv and CI
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY   # the service_role / secret key (market_prices is read-only for anon)
+        sync: false

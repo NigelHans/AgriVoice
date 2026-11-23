@@ -76,6 +76,17 @@ npx expo start
 ```
 Scan the QR code with the **Expo Go** app on your phone.
 
+### 3. Put the backend online (Render, optional)
+With a hosted backend the app works on any network, without your computer running.
+
+1. On https://render.com, sign up with GitHub (the free plan needs no card).
+2. **New → Blueprint**, pick this repository. Render reads `render.yaml` and creates `agrivoice-backend`.
+3. When asked, fill in `GROQ_API_KEY`, `SUPABASE_URL` and `SUPABASE_KEY` (the **service_role** key, same as `backend/.env`). Never commit them.
+4. Wait for the deploy to finish, then open `https://<your-service>.onrender.com/docs` to check it.
+5. In `mobile/.env`, set `EXPO_PUBLIC_BACKEND_URL=https://<your-service>.onrender.com` and restart Expo with `npx expo start -c`.
+
+Every merge to `main` redeploys automatically. The free plan sleeps after 15 minutes without requests; the app pings the backend when it opens, but the first answer after a quiet spell can still take about a minute.
+
 ### Troubleshooting
 - **Phone can't reach the backend:** the phone and computer must be on the same Wi-Fi, the firewall must allow port 8000, and the backend must run with `--host 0.0.0.0`.
 - **`.env` changes ignored:** restart Expo with `npx expo start -c`.

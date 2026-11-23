@@ -87,6 +87,19 @@ With a hosted backend the app works on any network, without your computer runnin
 
 Every merge to `main` redeploys automatically. The free plan sleeps after 15 minutes without requests; the app pings the backend when it opens, but the first answer after a quiet spell can still take about a minute.
 
+### 4. Build the installable Android app (APK)
+Testers can install the APK like any app: no Expo Go, no laptop, any network. It talks to the hosted backend.
+
+```bash
+cd mobile
+npx eas-cli login                       # once, with the Expo account that owns the project
+npx eas-cli build --platform android --profile preview
+```
+The build runs on Expo's servers (about 10-20 minutes on the free plan) and ends with a download link and QR code. On the phone, open the link, download the APK and allow "Install unknown apps" when Android asks.
+
+- The backend URL is set in `mobile/eas.json`. The app key is the `EXPO_PUBLIC_APP_KEY` variable in the EAS **preview** environment (`npx eas-cli env:list --environment preview`), never in the repo.
+- Rebuild after changing app code. Backend changes need no rebuild.
+
 ### Troubleshooting
 - **Phone can't reach the backend:** the phone and computer must be on the same Wi-Fi, the firewall must allow port 8000, and the backend must run with `--host 0.0.0.0`.
 - **`.env` changes ignored:** restart Expo with `npx expo start -c`.

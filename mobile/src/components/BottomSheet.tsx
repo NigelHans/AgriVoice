@@ -77,7 +77,7 @@ export default function BottomSheet({ visible, onClose, closeLabel, children }: 
 }
 
 const styles = themed(() => StyleSheet.create({
-  backdrop:   { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
+  backdrop:   { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   keyboardArea: { flex: 1, justifyContent: "flex-end" },
   sheet:      { maxHeight: "88%", backgroundColor: colors.card,
                 borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, borderColor: colors.glassBorder },

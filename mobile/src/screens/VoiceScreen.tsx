@@ -23,7 +23,7 @@ import {
   Platform,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import { Audio } from "expo-av";
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -55,6 +55,9 @@ const SILENCE_MS = 1500;          // pause after speaking that ends a tapped rec
 const MAX_RECORDING_MS = 60_000;  // hard stop
 const NO_SPEECH_MS = 6000;        // a tapped recording with no speech at all stops after this
 const HOLD_MS = 500;              // a press at least this long is hold-to-talk: release stops
+const LEVEL_CHECK_MS = 200;       // how often the mic level is checked for auto-stop
+// Module-level so useAudioRecorder gets the same options object every render
+const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
 
 // Example questions for a first-time user; tapping one asks it
 const SUGGESTIONS = ["voice.suggestPrice", "voice.suggestOffer", "voice.suggestPest"] as const;
@@ -87,7 +90,9 @@ export default function VoiceScreen() {
   // The spoken question may be misheard and has no answer yet ("Did you mean…?")
   const [confirming, setConfirming] = useState(false);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RECORDING_OPTIONS);
+  // The mic-level timer while recording; non-null means a recording is in progress
+  const recordingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Whether the current recording measured mic levels, and whether any of it was speech
   const speechRef = useRef<{ metered: boolean; heard: boolean } | null>(null);
   // Synchronous guard: state updates are async, so a fast double tap could slip past isLoading
@@ -159,37 +164,41 @@ export default function VoiceScreen() {
 
   // Leaving the tab (or unmounting) mid-recording discards the recording and releases the mic
   useFocusEffect(useCallback(() => () => {
-    const recording = recordingRef.current;
+    const timer = recordingRef.current;
     recordingRef.current = null;
     setIsRecording(false);
-    recording?.stopAndUnloadAsync().catch((err) => console.warn("Could not release recorder", err));
+    if (timer) {
+      clearInterval(timer);
+      recorder.stop().catch((err) => console.warn("Could not release recorder", err));
+    }
     stopAnswer();
-  }, []));
+  }, [recorder]));
 
   const startRecording = async () => {
     if (busyRef.current || recordingRef.current) return;
     // Never record the phone reading its own answer
     stopAnswer();
     setError(null);
-    let recording: Audio.Recording | null = null;
+    let started = false;
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setError(permission.canAskAgain ? MIC_ERRORS.denied : MIC_ERRORS.blocked);
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
 
-      recording = new Audio.Recording();
-      await recording.prepareToRecordAsync({ ...Audio.RecordingOptionsPresets.HIGH_QUALITY, isMeteringEnabled: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      started = true;
       // Auto-stop: after the farmer has spoken, a pause of SILENCE_MS ends the recording.
       // Without metering (some devices) only the tap, the release or MAX_RECORDING_MS stops it.
       // Recordings without speech are never sent: Whisper invents "Thank you for watching" for silence
       const speech = { metered: false, heard: false };
       speechRef.current = speech;
       let lastLoudAt = Date.now();
-      recording.setProgressUpdateInterval(200);
-      recording.setOnRecordingStatusUpdate((status) => {
+      recordingRef.current = setInterval(() => {
+        const status = recorder.getStatus();
         if (!status.isRecording) return;
         if (status.metering !== undefined) speech.metered = true;
         if (status.metering !== undefined && status.metering > SPEECH_DB) {
@@ -202,29 +211,27 @@ export default function VoiceScreen() {
           ? Date.now() - lastLoudAt > SILENCE_MS
           : speech.metered && status.durationMillis > NO_SPEECH_MS);
         if (silentTooLong || status.durationMillis > MAX_RECORDING_MS) stopRef.current();
-      });
-      await recording.startAsync();
-      recordingRef.current = recording;
+      }, LEVEL_CHECK_MS);
       setIsRecording(true);
     } catch (err) {
       console.warn("Could not start recording", err);
-      recording?.stopAndUnloadAsync().catch(() => {});
+      if (started) recorder.stop().catch(() => {});
       setError(MIC_ERRORS.start);
     }
   };
 
   const stopRecording = async () => {
-    const recording = recordingRef.current;
-    if (!recording) return;
-    // Cleared first, so a failed stop can never leave a stale recorder behind
+    const timer = recordingRef.current;
+    if (!timer) return;
+    // Cleared first, so a failed stop can never leave a stale recording state behind
     recordingRef.current = null;
-    recording.setOnRecordingStatusUpdate(null);
+    clearInterval(timer);
     setIsRecording(false);
 
     let uri: string | null = null;
     try {
-      await recording.stopAndUnloadAsync();
-      uri = recording.getURI();
+      await recorder.stop();
+      uri = recorder.uri;
     } catch (err) {
       console.warn("Could not stop recording", err);
     }

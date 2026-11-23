@@ -3,7 +3,7 @@
  * Only the spoken form changes: the text on screen stays exactly as the AI wrote it.
  */
 import * as Speech from "expo-speech";
-import { Audio } from "expo-av";
+import { setAudioModeAsync } from "expo-audio";
 import type { LanguageCode } from "../context/LanguageContext";
 
 // shortcut: phones have no Cebuano or Ilocano voice, so those are read with the Filipino voice; revisit if one appears.
@@ -25,7 +25,7 @@ export function toSpeech(text: string, language: LanguageCode): string {
 export async function speak(text: string, language: LanguageCode, onEnd: () => void, stillWanted: () => boolean): Promise<void> {
   Speech.stop();
   // After a recording, iOS keeps audio on the quiet earpiece until recording mode is switched off
-  await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true })
+  await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true })
     .catch((err) => console.warn("Could not switch audio to the speaker", err));
   if (!stillWanted()) return;
   Speech.speak(toSpeech(text, language), {

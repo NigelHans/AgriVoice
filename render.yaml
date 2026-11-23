@@ -20,3 +20,5 @@ services:
         sync: false
       - key: SUPABASE_KEY   # the service_role / secret key (market_prices is read-only for anon)
         sync: false
+      - key: APP_API_KEY    # same value as EXPO_PUBLIC_APP_KEY in mobile/.env; voice and chat require it
+        sync: false

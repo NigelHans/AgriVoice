@@ -11,7 +11,13 @@ const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
 // A free hosted backend (Render) sleeps when idle and needs up to ~1 min to wake, so the first request
 // after a quiet spell is slow. shortcut: one long timeout for all calls; lower it on a paid always-on plan.
-const api = axios.create({ baseURL: BASE_URL, timeout: 75_000 });
+// Sent with every backend request; the hosted backend requires it for voice and chat (APP_API_KEY on Render)
+const APP_KEY = process.env.EXPO_PUBLIC_APP_KEY;
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 75_000,
+  headers: APP_KEY ? { "X-App-Key": APP_KEY } : undefined,
+});
 
 // EXPO_PUBLIC_USE_MOCKS=true returns sample data from ./mocks instead of calling the backend.
 // shortcut: for UI work only; leave it unset (off) for real testing and release builds.

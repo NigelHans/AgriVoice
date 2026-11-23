@@ -30,9 +30,9 @@ AgriVoice/
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm/yarn
+- Node.js 22.13+ (or 24.3+) and npm
 - Python 3.12+
-- Expo Go app on your phone (no global Expo CLI needed; `npx expo` is used)
+- Expo Go app on your phone, the current version from the Play Store or App Store (the app uses Expo SDK 58; no global Expo CLI needed)
 - Groq API key (https://console.groq.com)
 - Supabase project (https://supabase.com)
 

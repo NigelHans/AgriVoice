@@ -3,12 +3,12 @@
  * backend, Supabase or a Groq key. Shapes match the real API (see ../types).
  * Never enable mocks in a release build.
  */
-import type { ChatResponse, CropPrice, VoiceResponse, WeatherForecast } from "../types";
+import type { AssistantReply, ChatResponse, CropPrice, VoiceResponse, WeatherForecast } from "../types";
 
 const DELAY_MS = 700;   // long enough to see loading states
 const wait = () => new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
-function negotiation(location: string, language: string): VoiceResponse["reply"] {
+function negotiation(location: string, language: string): AssistantReply {
   return {
     mode: "negotiation",
     extracted_data: { crop: "Onion", weight: 100, offer_per_kg: 60 },
@@ -24,7 +24,7 @@ function negotiation(location: string, language: string): VoiceResponse["reply"]
   };
 }
 
-function advice(language: string): VoiceResponse["reply"] {
+function advice(language: string): AssistantReply {
   return {
     mode: "advice",
     extracted_data: { crop: "Rice", weight: null, offer_per_kg: null },

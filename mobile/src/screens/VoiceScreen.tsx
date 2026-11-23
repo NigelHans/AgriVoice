@@ -53,6 +53,7 @@ const ARC = RING + 16;    // processing arc
 const SPEECH_DB = -40;            // louder than this (dBFS) counts as speaking
 const SILENCE_MS = 1500;          // pause after speaking that ends a tapped recording
 const MAX_RECORDING_MS = 60_000;  // hard stop
+const NO_SPEECH_MS = 6000;        // a tapped recording with no speech at all stops after this
 const HOLD_MS = 500;              // a press at least this long is hold-to-talk: release stops
 
 // Example questions for a first-time user; tapping one asks it
@@ -61,11 +62,12 @@ const SUGGESTIONS = ["voice.suggestPrice", "voice.suggestOffer", "voice.suggestP
 // Errors are stored as keys and translated when shown, so they follow a language change.
 // `typeInstead` adds the "type your question below" hint.
 type VoiceError = UiMessage & { typeInstead?: boolean };
-const MIC_ERRORS: Record<"denied" | "blocked" | "start" | "stop", VoiceError> = {
+const MIC_ERRORS: Record<"denied" | "blocked" | "start" | "stop" | "noSpeech", VoiceError> = {
   denied:  { key: "voice.micDenied", typeInstead: true },
   blocked: { key: "voice.micBlocked", typeInstead: true },
   start:   { key: "voice.micStart", typeInstead: true },
   stop:    { key: "voice.micStop" },
+  noSpeech: { key: "voice.noSpeech" },
 };
 
 export default function VoiceScreen() {
@@ -86,6 +88,8 @@ export default function VoiceScreen() {
   const [confirming, setConfirming] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  // Whether the current recording measured mic levels, and whether any of it was speech
+  const speechRef = useRef<{ metered: boolean; heard: boolean } | null>(null);
   // Synchronous guard: state updates are async, so a fast double tap could slip past isLoading
   const busyRef = useRef(false);
   const { language } = useLanguage();
@@ -172,18 +176,23 @@ export default function VoiceScreen() {
       await recording.prepareToRecordAsync({ ...Audio.RecordingOptionsPresets.HIGH_QUALITY, isMeteringEnabled: true });
       // Auto-stop: after the farmer has spoken, a pause of SILENCE_MS ends the recording.
       // Without metering (some devices) only the tap, the release or MAX_RECORDING_MS stops it.
-      let heardSpeech = false;
+      // Recordings without speech are never sent: Whisper invents "Thank you for watching" for silence
+      const speech = { metered: false, heard: false };
+      speechRef.current = speech;
       let lastLoudAt = Date.now();
       recording.setProgressUpdateInterval(200);
       recording.setOnRecordingStatusUpdate((status) => {
         if (!status.isRecording) return;
+        if (status.metering !== undefined) speech.metered = true;
         if (status.metering !== undefined && status.metering > SPEECH_DB) {
-          heardSpeech = true;
+          speech.heard = true;
           lastLoudAt = Date.now();
         }
         // While the button is held, a pause is just a pause: only the release stops it
         const holding = pressRef.current !== null;
-        const silentTooLong = !holding && heardSpeech && Date.now() - lastLoudAt > SILENCE_MS;
+        const silentTooLong = !holding && (speech.heard
+          ? Date.now() - lastLoudAt > SILENCE_MS
+          : speech.metered && status.durationMillis > NO_SPEECH_MS);
         if (silentTooLong || status.durationMillis > MAX_RECORDING_MS) stopRef.current();
       });
       await recording.startAsync();
@@ -213,6 +222,12 @@ export default function VoiceScreen() {
     }
     if (!uri) {
       setError(MIC_ERRORS.stop);
+      return;
+    }
+    // Only skipped when the mic level was measured; without metering the backend decides
+    const speech = speechRef.current;
+    if (speech?.metered && !speech.heard) {
+      setError(MIC_ERRORS.noSpeech);
       return;
     }
 

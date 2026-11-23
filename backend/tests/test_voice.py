@@ -129,3 +129,17 @@ def test_punctuation_only_transcript_counts_as_not_understood(client, fake_groq,
     response = client.post("/api/v1/voice/transcribe", files=AUDIO, data={"language": "ceb"})
     assert response.status_code == 422
     assert groq_fake.chat_calls == []
+
+
+def test_whisper_silence_phrases_count_as_not_understood(client, fake_groq, fake_supabase):
+    for phrase in [" Thank you for watching! ", "Thank you.", "Salamat sa panonood."]:
+        groq_fake = fake_groq(transcript=phrase)
+        fake_supabase()
+        assert client.post("/api/v1/voice/transcribe", files=AUDIO, data={"language": "fil"}).status_code == 422, phrase
+        assert groq_fake.chat_calls == []
+
+
+def test_real_question_with_thank_you_is_kept(client, fake_groq, fake_supabase):
+    fake_groq(transcript="Thank you, how much is onion today?", chat_replies=[extraction(intent="general"), "ok"])
+    fake_supabase()
+    assert client.post("/api/v1/voice/transcribe", files=AUDIO, data={"language": "en"}).status_code == 200

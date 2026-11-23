@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Applies migrations 001 and 002 to the live Supabase database, step by step.
+# Applies migrations 001, 002 and 003 to the live Supabase database, step by step.
 # Usage:  cd backend/database && ./migrate.sh
 # It asks before every change, saves all output under migration-logs/, and
 # stops at the first error. Each migration is one transaction: an error changes nothing.
@@ -31,8 +31,10 @@ q -c "select current_user, version();" -t || { echo "Could not connect. Check th
 
 has_001=$(q -tAc "select count(*) from information_schema.columns where table_schema='public' and table_name='market_prices' and column_name='is_legacy'")
 has_002=$(q -tAc "select count(*) = 0 from pg_policies where schemaname='public' and tablename='market_prices' and policyname='Allow full service access on prices'")
+has_003=$(q -tAc "select count(*) = 0 from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace cross join lateral aclexplode(d.defaclacl) a where d.defaclrole = 'postgres'::regrole and n.nspname = 'public' and d.defaclobjtype in ('r','S') and a.grantee in ('anon'::regrole::oid, 'authenticated'::regrole::oid)")
 echo "  migration 001 applied already: $([ "$has_001" = 1 ] && echo yes || echo no)"
 echo "  migration 002 applied already: $([ "$has_002" = t ] && echo yes || echo no)"
+echo "  migration 003 applied already: $([ "$has_003" = t ] && echo yes || echo no)"
 
 echo "== Step 1: read-only inspection (before)"
 inspect before
@@ -57,6 +59,16 @@ if [ "$has_002" != t ]; then
   inspect after-002
   echo "  Expect: only the 'Allow public read access on prices' policy; anon/authenticated have SELECT only."
   diff "$LOG/before-security.txt" "$LOG/after-002-security.txt" || true
+fi
+
+if [ "$has_003" != t ]; then
+  echo
+  echo "== Step 3b: migration 003 (tables added LATER are no longer open to the public key; existing tables unchanged)"
+  ask "Run 003 now?"
+  q -f migrations/003_restrict_default_privileges.sql 2>&1 | tee "$LOG/003-output.txt"
+  inspect after-003
+  echo "  Expect: the 'Default privileges' section no longer lists anon or authenticated for postgres (r and S rows)."
+  diff "$LOG/before-security.txt" "$LOG/after-003-security.txt" || true
 fi
 
 echo

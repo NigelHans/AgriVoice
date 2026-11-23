@@ -19,12 +19,39 @@ logger = logging.getLogger(__name__)
 
 WFP_CSV_URL = "https://data.humdata.org/dataset/wfp-food-prices-for-philippines/resource/9a842d72-0d7d-4922-ad0e-eb8106c1ab0e/download/wfp_food_prices_phl.csv"
 
-# WFP commodity name → crop name stored in Supabase (and asked of the LLM)
+# WFP commodity name → crop name stored in Supabase (and asked of the LLM).
+# Farm produce with retail PHP/KG prices in most regions (checked 2026-11: 14-17 of 17 regions).
+# Meat, fish and seafood are left out: AgriVoice is for crop farmers.
 CROP_MAPPING = {
-    "Onions (red)": "Onion",
-    "Tomatoes": "Tomato",
     "Rice (regular, milled)": "Rice",
+    "Rice (well milled)": "Well-milled Rice",
+    "Potatoes (Irish)": "Potato",
+    "Beans (mung)": "Mung Bean",
+    "Groundnuts (shelled)": "Peanut",
+    "Bananas (lakatan)": "Lakatan Banana",
+    "Bananas (latundan)": "Latundan Banana",
+    "Bananas (saba)": "Saba Banana",
+    "Bitter melon": "Bitter Gourd",
+    "Bottle gourd": "Bottle Gourd",
+    "Cabbage": "Cabbage",
+    "Cabbage (chinese)": "Chinese Cabbage",
+    "Calamansi": "Calamansi",
+    "Carrots": "Carrot",
+    "Choko": "Chayote",
+    "Coconut": "Coconut",
+    "Eggplants": "Eggplant",
+    "Garlic": "Garlic",
+    "Ginger": "Ginger",
+    "Mangoes (carabao)": "Carabao Mango",
+    "Onions (red)": "Onion",
+    "Squashes": "Squash",
+    "Tomatoes": "Tomato",
+    "Beans (green, fresh)": "Green Bean",
+    "Beans (string)": "String Bean",
 }
+CROP_NAMES = sorted(set(CROP_MAPPING.values()))
+
+UPSERT_BATCH = 500   # keeps each Supabase request small (a year of 25 crops is ~5,000 rows)
 
 PRICE_TYPE = "Retail"
 PRICE_SOURCE = "UN-WFP (retail)"
@@ -94,9 +121,9 @@ def run_price_sync(csv_source: str = WFP_CSV_URL) -> int:
             logger.warning("Price sync: no usable rows found in the WFP dataset.")
             return 0
 
-        get_supabase_client().table("market_prices").upsert(
-            rows, on_conflict=CONFLICT_COLUMNS
-        ).execute()
+        table = get_supabase_client().table("market_prices")
+        for start in range(0, len(rows), UPSERT_BATCH):
+            table.upsert(rows[start:start + UPSERT_BATCH], on_conflict=CONFLICT_COLUMNS).execute()
         logger.info("Price sync complete: %d rows upserted (latest %s).", len(rows), max(r["price_date"] for r in rows))
         return len(rows)
     except Exception:

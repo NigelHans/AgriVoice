@@ -5,7 +5,7 @@
  * Appears without sliding when the phone asks for reduced motion.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, KeyboardAvoidingView, Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useReduceMotion } from "./motion";
 import { colors, radius, spacing, themed } from "../theme";
@@ -61,7 +61,7 @@ export default function BottomSheet({ visible, onClose, closeLabel, children }: 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={closeLabel} accessibilityRole="button" />
       </Animated.View>
       {/* box-none: taps outside the sheet still reach the backdrop */}
-      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === "ios" ? "padding" : undefined} pointerEvents="box-none">
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior="padding" pointerEvents="box-none">
         <Animated.View
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg), transform: [{ translateY }] }]}
           accessibilityViewIsModal

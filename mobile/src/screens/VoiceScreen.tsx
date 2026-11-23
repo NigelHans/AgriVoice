@@ -20,7 +20,6 @@ import {
   Easing,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from "expo-audio";
@@ -387,7 +386,8 @@ export default function VoiceScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      // Edge-to-edge Android (SDK 54+) no longer resizes the window for the keyboard, so pad on both platforms
+      behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">

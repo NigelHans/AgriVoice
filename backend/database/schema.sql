@@ -3,6 +3,11 @@
 -- Existing projects: do not run this against an existing market_prices table;
 -- use database/migrations/ instead.
 
+-- New tables in public get no anon/authenticated access by default (same as migration 003);
+-- each table below grants what the app needs explicitly. The backend uses service_role.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+
 -- ============================================================
 -- TABLE: market_prices
 -- Stores monthly crop prices synced from UN-WFP public data.
@@ -32,6 +37,12 @@ CREATE INDEX IF NOT EXISTS idx_market_prices_region ON market_prices (region);
 -- Existing databases: see migrations/001_market_prices_standardize.sql
 CREATE UNIQUE INDEX IF NOT EXISTS uq_market_prices_crop_region_date
     ON market_prices (crop_name, region, price_date);
+
+-- Read-only for the public API key (same end state as migration 002); only service_role writes
+ALTER TABLE market_prices ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON market_prices TO anon, authenticated;
+DROP POLICY IF EXISTS "Allow public read access on prices" ON market_prices;
+CREATE POLICY "Allow public read access on prices" ON market_prices FOR SELECT TO public USING (true);
 
 -- ============================================================
 -- TABLE: conversations
@@ -89,3 +100,8 @@ VALUES
     ('Tomato',          'Kamatis',  'Kamatis',  'Vegetables', ARRAY['July','August','September'],         ARRAY['October','November','December']),
     ('Banana',          'Saging',   'Saging',   'Fruits',     ARRAY['Year-round'],                        ARRAY['Year-round'])
 ON CONFLICT DO NOTHING;
+
+-- The remaining tables are backend-only (service_role bypasses RLS): RLS on, no policies, no grants
+ALTER TABLE conversations   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crops_reference ENABLE ROW LEVEL SECURITY;

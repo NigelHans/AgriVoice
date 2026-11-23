@@ -9,11 +9,19 @@ import * as mocks from "./mocks";
 // In production, replace with your deployed backend URL.
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
-const api = axios.create({ baseURL: BASE_URL, timeout: 30_000 });
+// A free hosted backend (Render) sleeps when idle and needs up to ~1 min to wake, so the first request
+// after a quiet spell is slow. shortcut: one long timeout for all calls; lower it on a paid always-on plan.
+const api = axios.create({ baseURL: BASE_URL, timeout: 75_000 });
 
 // EXPO_PUBLIC_USE_MOCKS=true returns sample data from ./mocks instead of calling the backend.
 // shortcut: for UI work only; leave it unset (off) for real testing and release builds.
 const USE_MOCKS = process.env.EXPO_PUBLIC_USE_MOCKS === "true";
+
+/** Fire-and-forget ping at app start, so a sleeping backend is awake by the time the farmer asks. */
+export function wakeBackend(): void {
+  if (USE_MOCKS) return;
+  api.get("/health").catch(() => {});   // failures surface on the real request instead
+}
 
 // ---------------------------------------------------------------------------
 // Voice

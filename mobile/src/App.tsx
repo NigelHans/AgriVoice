@@ -3,7 +3,7 @@
  * Bottom Tab Navigator + Region Selector State
  */
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { NavigationContainer, DefaultTheme, DarkTheme, type NavigationState } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -25,6 +25,7 @@ import SettingsScreen from "./screens/SettingsScreen";
 import { withFocusFade } from "./components/FocusFade";
 import PressableScale from "./components/PressableScale";
 import { colors, fonts, spacing, touch } from "./theme";
+import { wakeBackend } from "./services/api";
 
 const Tab = createBottomTabNavigator();
 
@@ -44,6 +45,7 @@ const ICON_MAP: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
 };
 
 export default function App() {
+  useEffect(wakeBackend, []);
   const [fontsLoaded, fontError] = useFonts({
     [fonts.regular]: require("../assets/fonts/AtkinsonHyperlegible-Regular.ttf"),
     [fonts.bold]: require("../assets/fonts/AtkinsonHyperlegible-Bold.ttf"),
